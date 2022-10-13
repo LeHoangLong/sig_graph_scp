@@ -1,0 +1,10 @@
+version: '3.0'
+services:
+  server:
+    image: golang:1.19.2-buster
+    volumes:
+      - ./:/root
+    network_mode: host
+    command: sleep infinity
+    
+      
