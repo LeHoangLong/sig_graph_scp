@@ -1,6 +1,8 @@
 package utility_sig_graph
 
 import (
+	"crypto/ecdsa"
+	"crypto/x509"
 	"os"
 	"sync"
 )
@@ -10,7 +12,10 @@ type SettingsI interface {
 	ChannelName() string
 	ContractName() string
 	MspId() string
-	X509CertificateData() string
+	IdentityX509Certificate() *x509.Certificate
+	IdentityEDCSAKey() *ecdsa.PrivateKey
+	TlsX509Certificate() *x509.Certificate
+	GatewayPeer() string
 }
 
 var instance SettingsI

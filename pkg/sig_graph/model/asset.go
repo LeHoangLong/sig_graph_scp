@@ -14,9 +14,36 @@ type Asset struct {
 	MaterialName    string                 `json:"material_name"`
 }
 
+func NewAsset(
+	node Node,
+	creationProcess model.ECreationProcess,
+	unit string,
+	quantity decimal.Decimal,
+	materialName string,
+) Asset {
+	return Asset{
+		Node:            node,
+		CreationProcess: creationProcess,
+		Unit:            unit,
+		Quantity:        quantity,
+		MaterialName:    materialName,
+	}
+}
+
 func ToModelAsset(asset *Asset, modelNode *model.Node) model.Asset {
 	return model.Asset{
 		Node:            *modelNode,
+		CreationProcess: asset.CreationProcess,
+		Unit:            asset.Unit,
+		Quantity:        asset.Quantity,
+		MaterialName:    asset.MaterialName,
+	}
+}
+
+func FromModelAsset(asset *model.Asset) Asset {
+	node := FromModelNode(&asset.Node)
+	return Asset{
+		Node:            node,
 		CreationProcess: asset.CreationProcess,
 		Unit:            asset.Unit,
 		Quantity:        asset.Quantity,

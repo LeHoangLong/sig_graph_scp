@@ -27,8 +27,6 @@ func NewAssetRepositoryGorm(
 }
 
 type gormAsset struct {
-	gorm.Model
-
 	CreationProcess string
 	Unit            string
 	Quantity        decimal.Decimal `gorm:"type:numeric"`
@@ -38,6 +36,7 @@ type gormAsset struct {
 }
 
 func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId TransactionId, iAsset *model.Asset) error {
+	iAsset.Node.NodeType = "asset"
 	err := r.nodeRepository.UpsertNode(ctx, transactionId, &iAsset.Node)
 	if err != nil {
 		return err
@@ -56,8 +55,6 @@ func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId Trans
 		NodeDbId:        uint64(iAsset.DbId),
 	}
 	err = tx.Omit(clause.Associations).Create(&asset).Error
-
-	iAsset.Node.DbId = model.DbId(asset.Node.ID)
 	return err
 }
 
@@ -72,7 +69,7 @@ func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm
 		nodeIdMap[nodes[i].DbId] = nodes[i]
 	}
 
-	err := tx.Where("node_id IN ?", nodesIds).Omit("Node").Order("node_id asc").Find(&assets).Error
+	err := tx.Where("node_db_id IN ?", nodesIds).Omit("Node").Order("node_db_id asc").Find(&assets).Error
 	if err != nil {
 		return []model.Asset{}, err
 	}
@@ -100,7 +97,7 @@ func (r *assetRepositoryGorm) FetchAssetsByOwner(ctx context.Context, transactio
 		return []model.Asset{}, err
 	}
 
-	nodes, err := r.nodeRepository.FetchNodesByOwnerPublicKey(ctx, transactionId, ownerPublicKey)
+	nodes, err := r.nodeRepository.FetchNodesByOwnerPublicKey(ctx, transactionId, "asset", ownerPublicKey)
 
 	ret, err := r.fetchAssetsFromNodes(ctx, tx, nodes)
 	if err != nil {
@@ -116,7 +113,7 @@ func (r *assetRepositoryGorm) FetchAssetsByIds(ctx context.Context, transactionI
 		return []model.Asset{}, err
 	}
 
-	nodes, err := r.nodeRepository.FetchNodesByNodeId(ctx, transactionId, namespace, iIds)
+	nodes, err := r.nodeRepository.FetchNodesByNodeId(ctx, transactionId, "asset", namespace, iIds)
 	if err != nil {
 		return []model.Asset{}, err
 	}

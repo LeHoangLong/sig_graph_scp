@@ -1,0 +1,105 @@
+package view
+
+import (
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"sig_graph_scp/cmd/middleware"
+	"sig_graph_scp/cmd/utility"
+	"sig_graph_scp/pkg/model"
+	controller_server "sig_graph_scp/pkg/server/controller"
+
+	"github.com/gin-gonic/gin"
+)
+
+type userKeyPairView struct {
+	controller controller_server.UserKeyPairControllerI
+}
+
+func NewUserKeyPairView(
+	controller controller_server.UserKeyPairControllerI,
+) *userKeyPairView {
+	return &userKeyPairView{
+		controller: controller,
+	}
+}
+
+func (v *userKeyPairView) GetUserKeyPairsByUser(c *gin.Context) {
+	user := middleware.GetUser(c.Request.Context())
+
+	userKeyPairs, err := v.controller.FetchKeyPairsByUser(c.Request.Context(), user)
+	if err != nil {
+		utility.AbortWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, userKeyPairs)
+	return
+}
+
+type AddUserKeyPairToUserRequest struct {
+	PublicKey  *multipart.FileHeader `form:"public_key"`
+	PrivateKey *multipart.FileHeader `form:"private_key"`
+}
+
+func (v *userKeyPairView) AddUserKeyPairToUser(c *gin.Context) {
+	user := middleware.GetUser(c.Request.Context())
+	request := AddUserKeyPairToUserRequest{}
+	if err := c.ShouldBind(&request); err != nil {
+		fmt.Println("bind err ", err)
+		utility.AbortBadRequest(c, err)
+		return
+	}
+
+	if request.PrivateKey == nil || request.PublicKey == nil {
+		utility.AbortBadRequest(c, fmt.Errorf("missing parameter"))
+		return
+	}
+
+	publicKey := ""
+	{
+		file, err := request.PublicKey.Open()
+		if err != nil {
+			utility.AbortWithError(c, err)
+			return
+		}
+
+		data, err := io.ReadAll(file)
+		if err != nil {
+			utility.AbortWithError(c, err)
+			return
+		}
+		publicKey = string(data)
+	}
+
+	privateKey := ""
+	{
+		file, err := request.PrivateKey.Open()
+		if err != nil {
+			utility.AbortWithError(c, err)
+			return
+		}
+
+		data, err := io.ReadAll(file)
+		if err != nil {
+			utility.AbortWithError(c, err)
+			return
+		}
+		privateKey = string(data)
+	}
+
+	userKeyPair := &model.UserKeyPair{
+		Private: privateKey,
+		Public:  publicKey,
+	}
+
+	err := v.controller.AddKeyPairToUser(c.Request.Context(), user, userKeyPair)
+	if err != nil {
+		utility.AbortWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, "")
+	return
+}

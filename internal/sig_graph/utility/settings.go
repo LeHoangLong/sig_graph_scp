@@ -1,7 +1,9 @@
 package utility_sig_graph
 
 import (
-	"encoding/base64"
+	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -10,11 +12,15 @@ import (
 )
 
 type settings struct {
-	peerAddresses       []string
-	channelName         string
-	contractName        string
-	mspId               string
-	x509CertificateData string
+	peerAddresses           []string
+	channelName             string
+	contractName            string
+	mspId                   string
+	identityX509Certificate *x509.Certificate
+	identityPeerPrivateKey  *ecdsa.PrivateKey
+
+	TlsCetificate *x509.Certificate
+	gatewayPeer   string
 }
 
 func NewSettingsFromEnv() (SettingsI, error) {
@@ -49,6 +55,36 @@ func NewSettingsFromEnv() (SettingsI, error) {
 		ret.mspId = value
 	}
 
+	if value, ok := os.LookupEnv("GATEWAY_PEER"); !ok {
+		return nil, fmt.Errorf("%w: missing env var GATEWAY_PEER", utility.ErrNotFound)
+	} else {
+		ret.gatewayPeer = value
+	}
+
+	if value, ok := os.LookupEnv("TLS_PEM_CERTIFICATE_PATH"); !ok {
+		return nil, fmt.Errorf("%w: missing env var TLS_PEM_CERTIFICATE_PATH", utility.ErrNotFound)
+	} else {
+		if _, err := os.Stat(value); errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("%w: file not found %s", utility.ErrNotFound, value)
+		}
+
+		fileData, err := os.ReadFile(value)
+		if err != nil {
+			return nil, err
+		}
+
+		pemDecoded, _ := pem.Decode(fileData)
+		if pemDecoded == nil {
+			return nil, fmt.Errorf("could not decode pem file")
+		}
+
+		certificate, err := x509.ParseCertificate(pemDecoded.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		ret.TlsCetificate = certificate
+	}
+
 	if value, ok := os.LookupEnv("PEM_CERTIFICATE_PATH"); !ok {
 		return nil, fmt.Errorf("%w: missing env var PEM_CERTIFICATE_PATH", utility.ErrNotFound)
 	} else {
@@ -61,11 +97,54 @@ func NewSettingsFromEnv() (SettingsI, error) {
 			return nil, err
 		}
 
-		base64Decoded, err := base64.StdEncoding.DecodeString(string(fileData))
-		ret.x509CertificateData = string(base64Decoded)
+		pemDecoded, _ := pem.Decode(fileData)
+		if pemDecoded == nil {
+			return nil, fmt.Errorf("could not decode pem file")
+		}
+
+		ret.identityX509Certificate, err = x509.ParseCertificate(pemDecoded.Bytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if value, ok := os.LookupEnv("PEM_SECRET_KEY_PATH"); !ok {
+		return nil, fmt.Errorf("%w: missing env var PEM_SECRET_KEY_PATH", utility.ErrNotFound)
+	} else {
+		if _, err := os.Stat(value); errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("%w: file not found %s", utility.ErrNotFound, value)
+		}
+
+		fileData, err := os.ReadFile(value)
+		if err != nil {
+			return nil, err
+		}
+
+		pemDecoded, _ := pem.Decode(fileData)
+		if pemDecoded == nil {
+			return nil, fmt.Errorf("could not decode pem file")
+		}
+
+		privateKey, err := x509.ParsePKCS8PrivateKey(pemDecoded.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		if privateKey, ok := privateKey.(*ecdsa.PrivateKey); !ok {
+			return nil, fmt.Errorf("only ecdsa key supported")
+		} else {
+			ret.identityPeerPrivateKey = privateKey
+		}
 	}
 
 	return ret, nil
+}
+
+func (s *settings) GatewayPeer() string {
+	return s.gatewayPeer
+}
+
+func (s *settings) TlsX509Certificate() *x509.Certificate {
+	return s.TlsCetificate
 }
 
 func (s *settings) PeerAddresses() []string {
@@ -84,6 +163,10 @@ func (s *settings) MspId() string {
 	return s.mspId
 }
 
-func (s *settings) X509CertificateData() string {
-	return s.x509CertificateData
+func (s *settings) IdentityX509Certificate() *x509.Certificate {
+	return s.identityX509Certificate
+}
+
+func (s *settings) IdentityEDCSAKey() *ecdsa.PrivateKey {
+	return s.identityPeerPrivateKey
 }

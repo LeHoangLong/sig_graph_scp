@@ -3,8 +3,6 @@ package repository_server
 import (
 	"context"
 	"sig_graph_scp/pkg/model"
-
-	"gorm.io/gorm"
 )
 
 type userKeyRepositoryGorm struct {
@@ -20,9 +18,8 @@ func NewUserKeyRepositoryGorm(
 }
 
 type gormUserKeyPair struct {
-	gorm.Model
-	UserId     model.UserId `gorm:"primaryKey,priority:1"`
-	ID         uint64       `gorm:"primaryKey,priority:2"`
+	ID         uint64       `gorm:"primaryKey"`
+	UserId     model.UserId `gorm:"index:user_id_index"`
 	User       model.User   `gorm:"foreignKey:UserId;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	PublicKey  string
 	PrivateKey string
@@ -47,6 +44,7 @@ func (r *userKeyRepositoryGorm) FetchKeyPairsOfUser(
 	modelKeyPairs := []model.UserKeyPair{}
 	for i := range keyPairs {
 		modelKeyPair := model.UserKeyPair{
+			Id:      keyPairs[i].ID,
 			Public:  keyPairs[i].PublicKey,
 			Private: keyPairs[i].PrivateKey,
 		}
@@ -55,4 +53,20 @@ func (r *userKeyRepositoryGorm) FetchKeyPairsOfUser(
 	}
 
 	return modelKeyPairs, nil
+}
+
+func (r *userKeyRepositoryGorm) AddKeyPairToUser(ctx context.Context, transactionId TransactionId, user *model.User, keyPair *model.UserKeyPair) error {
+	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
+	if err != nil {
+		return err
+	}
+
+	gormKeyPair := gormUserKeyPair{
+		UserId:     user.ID,
+		PublicKey:  keyPair.Public,
+		PrivateKey: keyPair.Private,
+	}
+
+	err = tx.Omit("User").Create(&gormKeyPair).Error
+	return err
 }

@@ -18,7 +18,10 @@ type transactionManagerGorm struct {
 
 func NewTransactionManagerGorm(db *gorm.DB) *transactionManagerGorm {
 	return &transactionManagerGorm{
-		db: db,
+		db:                 db,
+		mtx:                utility.NewMutex(),
+		transactionCounter: 0,
+		activeTransactions: map[TransactionId]*gorm.DB{},
 	}
 }
 
@@ -48,7 +51,14 @@ func (m *transactionManagerGorm) StartTransaction(ctx context.Context, option *T
 	if m.transactionCounter == 0 {
 		m.transactionCounter = 1
 	}
-	tx := m.db.Begin()
+
+	sqlOption := sql.TxOptions{}
+
+	if option != nil {
+		sqlOption.Isolation = isolationLevelToGormIsolationLevel(option.IsolationLevel)
+	}
+
+	tx := m.db.Begin(&sqlOption)
 	m.activeTransactions[transactionId] = tx
 
 	return transactionId, nil

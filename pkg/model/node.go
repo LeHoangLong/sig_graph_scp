@@ -6,6 +6,7 @@ type NodeId string
 
 type PrivateId struct {
 	Id     NodeId `json:"id"`
+	Hash   string `json:"hash"`
 	Secret string `json:"secret"`
 }
 
@@ -20,12 +21,13 @@ type Node struct {
 
 	Id        NodeId `json:"id"`
 	Namespace string `json:"-"`
+	NodeType  string `json:"node_type"`
 
 	PublicParentsIds  map[string]bool `json:"public_parents_ids"`
 	PublicChildrenIds map[string]bool `json:"public_children_ids"`
 
-	PrivateParentsIds  map[PrivateId]bool `json:"private_parents_ids"`
-	PrivateChildrenIds map[PrivateId]bool `json:"private_children_ids"`
+	PrivateParentsIds  map[string]PrivateId `json:"private_parents_ids"` // key is the hash
+	PrivateChildrenIds map[string]PrivateId `json:"private_children_ids"`
 
 	IsFinalized    bool   `json:"is_finalized"`
 	CreatedTime    uint64 `json:"created_time"`

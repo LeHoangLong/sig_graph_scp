@@ -4,7 +4,6 @@ import (
 	"context"
 	"sig_graph_scp/pkg/model"
 
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -23,34 +22,33 @@ func NewNodeRepositoryGorm(
 }
 
 type gormNode struct {
-	gorm.Model
 	ID             uint64 `gorm:"primaryKey,autoIncrement"`
-	NodeID         string `gorm:"index:node_id_and_namespace,unique"`
-	Namespace      string `gorm:"index:node_id_and_namespace,unique"`
+	NodeID         string `gorm:"column:node_id;index:node_id_and_namespace,unique"`
+	Namespace      string `gorm:"column:node_namespace;index:node_id_and_namespace,unique"`
+	NodeType       string `gorm:"not null"`
 	IsFinalized    bool   `gorm:"not null"`
 	CreatedTime    uint64 `gorm:"not null"`
 	UpdatedTime    uint64 `gorm:"not null"`
-	Signature      string `gorm:"not null"`
+	Signature      string `gorm:"column:node_signature;not null"`
 	OwnerPublicKey string `gorm:"not null"`
 
-	PublicParentsIds  []publicEdge `gorm:"foreignKey:NodeDbId"`
-	PublicChildrenIds []publicEdge `gorm:"foreignKey:NodeDbId"`
+	PublicParentsIds  []gormPublicEdge `gorm:"foreignKey:NodeDbId"`
+	PublicChildrenIds []gormPublicEdge `gorm:"foreignKey:NodeDbId"`
 
-	PrivateParentsIds  []privateEdge `gorm:"foreignKey:NodeDbId"`
-	PrivateChildrenIds []privateEdge `gorm:"foreignKey:NodeDbId"`
+	PrivateParentsIds  []gormPrivateEdge `gorm:"foreignKey:NodeDbId"`
+	PrivateChildrenIds []gormPrivateEdge `gorm:"foreignKey:NodeDbId"`
 }
 
-type publicEdge struct {
-	gorm.Model
+type gormPublicEdge struct {
 	NodeDbId uint64 `gorm:"primaryKey,priority:1"`
-	Value    string `gorm:"primaryKey,priority:2"`
+	Value    string `gorm:"column:other_node_id;primaryKey,priority:2"`
 }
 
-type privateEdge struct {
-	gorm.Model
+type gormPrivateEdge struct {
 	NodeDbId uint64 `gorm:"primaryKey,priority:1"`
-	Value    string `gorm:"primaryKey,priority:2"`
-	Secret   string `gorm:"not null;default:"`
+	Hash     string `gorm:"primaryKey,priority:2"`
+	Value    string `gorm:"column:other_node_id"`
+	Secret   string `gorm:"column:other_node_id_secret;not null;default:"`
 }
 
 func (r *nodeRepositoryGorm) UpsertNode(
@@ -66,6 +64,7 @@ func (r *nodeRepositoryGorm) UpsertNode(
 	gormNode := gormNode{
 		NodeID:         string(iNode.Id),
 		Namespace:      iNode.Namespace,
+		NodeType:       iNode.NodeType,
 		IsFinalized:    iNode.IsFinalized,
 		CreatedTime:    iNode.CreatedTime,
 		UpdatedTime:    iNode.UpdatedTime,
@@ -74,29 +73,31 @@ func (r *nodeRepositoryGorm) UpsertNode(
 	}
 
 	for publicParent := range iNode.PublicParentsIds {
-		id := publicEdge{
+		id := gormPublicEdge{
 			Value: publicParent,
 		}
 		gormNode.PublicParentsIds = append(gormNode.PublicParentsIds, id)
 	}
 
 	for publicChildren := range iNode.PublicChildrenIds {
-		id := publicEdge{
+		id := gormPublicEdge{
 			Value: publicChildren,
 		}
 		gormNode.PublicParentsIds = append(gormNode.PublicParentsIds, id)
 	}
 
-	for privateParent := range iNode.PrivateParentsIds {
-		id := privateEdge{
+	for _, privateParent := range iNode.PrivateParentsIds {
+		id := gormPrivateEdge{
+			Hash:   privateParent.Hash,
 			Value:  string(privateParent.Id),
 			Secret: privateParent.Secret,
 		}
 		gormNode.PrivateParentsIds = append(gormNode.PrivateParentsIds, id)
 	}
 
-	for privateChildren := range iNode.PrivateChildrenIds {
-		id := privateEdge{
+	for _, privateChildren := range iNode.PrivateChildrenIds {
+		id := gormPrivateEdge{
+			Hash:   privateChildren.Hash,
 			Value:  string(privateChildren.Id),
 			Secret: privateChildren.Secret,
 		}
@@ -107,7 +108,7 @@ func (r *nodeRepositoryGorm) UpsertNode(
 		clause.OnConflict{
 			Columns: []clause.Column{
 				{Name: "node_id"},
-				{Name: "namespace"},
+				{Name: "node_namespace"},
 			},
 			UpdateAll: true,
 		},
@@ -134,22 +135,24 @@ func gormNodeToModelNode(node gormNode) model.Node {
 		publicChildrenIds[id.Value] = true
 	}
 
-	privateParentsIds := map[model.PrivateId]bool{}
+	privateParentsIds := map[string]model.PrivateId{}
 	for _, id := range node.PrivateParentsIds {
 		privateId := model.PrivateId{
 			Id:     model.NodeId(id.Value),
+			Hash:   id.Hash,
 			Secret: id.Secret,
 		}
-		privateParentsIds[privateId] = true
+		privateParentsIds[id.Hash] = privateId
 	}
 
-	privateChildrenIds := map[model.PrivateId]bool{}
+	privateChildrenIds := map[string]model.PrivateId{}
 	for _, id := range node.PrivateChildrenIds {
 		privateId := model.PrivateId{
 			Id:     model.NodeId(id.Value),
 			Secret: id.Secret,
+			Hash:   id.Hash,
 		}
-		privateChildrenIds[privateId] = true
+		privateChildrenIds[id.Hash] = privateId
 	}
 
 	modelNode := model.Node{
@@ -169,7 +172,7 @@ func gormNodeToModelNode(node gormNode) model.Node {
 	return modelNode
 }
 
-func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, ownerPublicKey string) ([]model.Node, error) {
+func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType string, ownerPublicKey string) ([]model.Node, error) {
 	nodes := []gormNode{}
 
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
@@ -177,7 +180,7 @@ func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(ctx context.Context, tra
 		return []model.Node{}, err
 	}
 
-	tx.Where("owner_public_key = ?", ownerPublicKey).Order("id asc").Find(&nodes)
+	tx.Where("owner_public_key = ? AND node_type = ?", ownerPublicKey, nodeType).Order("id asc").Find(&nodes)
 
 	ret := []model.Node{}
 	for i := range nodes {
@@ -190,6 +193,7 @@ func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(ctx context.Context, tra
 func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 	ctx context.Context,
 	transactionId TransactionId,
+	nodeType string,
 	namespace string,
 	iIds map[model.NodeId]bool,
 ) ([]model.Node, error) {
@@ -204,7 +208,7 @@ func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 	}
 
 	nodes := []gormNode{}
-	err = tx.Where("namespace = ? AND node_id IN ?", namespace, iIds).Find(&nodes).Error
+	err = tx.Where("node_namespace = ? AND node_id IN ? AND node_type = ?", namespace, ids, nodeType).Find(&nodes).Error
 	if err != nil {
 		return []model.Node{}, err
 	}

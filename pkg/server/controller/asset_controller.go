@@ -2,32 +2,130 @@ package controller_server
 
 import (
 	"context"
+	"crypto/sha512"
 	"fmt"
-	service_sig_graph "sig_graph_scp/internal/sig_graph/service"
 	"sig_graph_scp/pkg/model"
 	repository_server "sig_graph_scp/pkg/server/repository"
+	api_sig_graph "sig_graph_scp/pkg/sig_graph/api"
 	model_sig_graph "sig_graph_scp/pkg/sig_graph/model"
+	"sig_graph_scp/pkg/utility"
+
+	"github.com/shopspring/decimal"
 )
 
 type assetController struct {
-	service            service_sig_graph.AssetServiceI
+	api                api_sig_graph.AssetClientApi
 	repository         repository_server.AssetRepositoryI
 	keyRepository      repository_server.UserKeyRepositoryI
 	transactionManager repository_server.TransactionManagerI
 }
 
 func NewAssetController(
-	service service_sig_graph.AssetServiceI,
+	api api_sig_graph.AssetClientApi,
 	repository repository_server.AssetRepositoryI,
 	keyRepository repository_server.UserKeyRepositoryI,
 	transactionManager repository_server.TransactionManagerI,
 ) AssetControllerI {
 	return &assetController{
-		service:            service,
+		api:                api,
 		repository:         repository,
 		keyRepository:      keyRepository,
 		transactionManager: transactionManager,
 	}
+}
+
+func (c *assetController) CreateAsset(
+	ctx context.Context,
+	user *model.User,
+	materialName string,
+	unit string,
+	quantity decimal.Decimal,
+	ownerKeyId model.UserKeyPairId,
+	ingredients []model.Asset,
+	ingredientSecretIds []string,
+	secretIds []string,
+	ingredientSignatures []string,
+) (*model.Asset, error) {
+	if len(ingredients) != len(ingredientSecretIds) {
+		return nil, fmt.Errorf("mismatch length")
+	}
+
+	if len(ingredients) != len(secretIds) {
+		return nil, fmt.Errorf("mismatch length")
+	}
+
+	if len(ingredients) != len(ingredientSignatures) {
+		return nil, fmt.Errorf("mismatch length")
+	}
+
+	transactionId, err := c.transactionManager.BypassTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer c.transactionManager.StopBypassedTransaction(ctx, transactionId)
+
+	ownerKeys, err := c.keyRepository.FetchKeyPairsOfUser(ctx, transactionId, user)
+	if err != nil {
+		return nil, err
+	}
+
+	var ownerKey *model.UserKeyPair = nil
+	for i := range ownerKeys {
+		if ownerKeys[i].Id == ownerKeyId {
+			ownerKey = &ownerKeys[i]
+		}
+	}
+
+	if ownerKey == nil {
+		return nil, fmt.Errorf("%w: no owner key with id %d", utility.ErrNotFound, ownerKeyId)
+	}
+
+	sigGraphIngredients := make([]model_sig_graph.Asset, 0, len(ingredients))
+	for i := range ingredients {
+		sigGraphIngredients = append(sigGraphIngredients, model_sig_graph.FromModelAsset(&ingredients[i]))
+	}
+
+	asset, err := c.api.CreateAsset(
+		ctx,
+		materialName,
+		unit,
+		quantity,
+		ownerKey,
+		sigGraphIngredients,
+		ingredientSecretIds,
+		secretIds,
+		ingredientSignatures,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	secretParentIds := map[string]model.PrivateId{}
+	for i := range ingredients {
+		id := ingredients[i].Id
+		secret := ingredientSecretIds[i]
+		if secret != "" {
+			secretId := fmt.Sprintf("%s%s", id, secret)
+			sum := sha512.Sum512([]byte(secretId))
+			hash := string(sum[:])
+			privateId := model.PrivateId{
+				Id:     id,
+				Hash:   hash,
+				Secret: secret,
+			}
+			secretParentIds[hash] = privateId
+		}
+	}
+
+	namespace := fmt.Sprintf("%d", user.ID)
+	modelNode := model_sig_graph.ToModelNode(&asset.Node, 0, namespace, secretParentIds, map[string]model.PrivateId{})
+	modelAsset := model_sig_graph.ToModelAsset(asset, &modelNode)
+
+	// save asset
+	c.repository.SaveAsset(ctx, transactionId, &modelAsset)
+
+	return &modelAsset, nil
 }
 
 func (c *assetController) GetAssetById(ctx context.Context, user *model.User, id model.NodeId, useCache bool) (*model.Asset, error) {
@@ -38,6 +136,7 @@ func (c *assetController) GetAssetById(ctx context.Context, user *model.User, id
 		if err != nil {
 			return nil, err
 		}
+		defer c.transactionManager.StopBypassedTransaction(ctx, transactionId)
 
 		assets, err := c.repository.FetchAssetsByIds(ctx, transactionId, fmt.Sprintf("%d", user.ID), map[model.NodeId]bool{id: true})
 		if err != nil {
@@ -49,17 +148,15 @@ func (c *assetController) GetAssetById(ctx context.Context, user *model.User, id
 		}
 	}
 
-	asset, err := c.service.GetAssetById(ctx, id)
+	asset, err := c.api.GetAssetById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	modelNode := model_sig_graph.ToModelNode(&asset.Node, 0, fmt.Sprintf("%d", user.ID), map[model.PrivateId]bool{}, map[model.PrivateId]bool{})
+	modelNode := model_sig_graph.ToModelNode(&asset.Node, 0, fmt.Sprintf("%d", user.ID), map[string]model.PrivateId{}, map[string]model.PrivateId{})
 	modelAsset := model_sig_graph.ToModelAsset(asset, &modelNode)
 
-	if useCache {
-		c.repository.SaveAsset(ctx, transactionId, &modelAsset)
-	}
+	c.repository.SaveAsset(ctx, transactionId, &modelAsset)
 
 	return &modelAsset, nil
 }
@@ -69,6 +166,7 @@ func (c *assetController) GetOwnedAssetsFromCache(ctx context.Context, user *mod
 	if err != nil {
 		return nil, err
 	}
+	defer c.transactionManager.StopBypassedTransaction(ctx, transactionId)
 
 	keys, err := c.keyRepository.FetchKeyPairsOfUser(ctx, transactionId, user)
 	if err != nil {

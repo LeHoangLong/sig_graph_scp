@@ -39,7 +39,7 @@ func NewDefaultNode(
 	}
 }
 
-func ToModelNode(node *Node, dbId model.DbId, namespace string, secretParentIds map[model.PrivateId]bool, secretChildrenIds map[model.PrivateId]bool) model.Node {
+func ToModelNode(node *Node, dbId model.DbId, namespace string, secretParentIds map[string]model.PrivateId, secretChildrenIds map[string]model.PrivateId) model.Node {
 	return model.Node{
 		DbId:               dbId,
 		Id:                 node.Id,
@@ -53,5 +53,31 @@ func ToModelNode(node *Node, dbId model.DbId, namespace string, secretParentIds 
 		UpdatedTime:        node.UpdatedTime,
 		Signature:          node.Signature,
 		OwnerPublicKey:     node.OwnerPublicKey,
+	}
+}
+
+func FromModelNode(node *model.Node) Node {
+	privateParentsHashedIds := map[string]bool{}
+	for hash := range node.PrivateParentsIds {
+		privateParentsHashedIds[hash] = true
+	}
+
+	privateChildrenHashedIds := map[string]bool{}
+	for hash := range node.PrivateChildrenIds {
+		privateChildrenHashedIds[hash] = true
+	}
+
+	return Node{
+		Id:                       node.Id,
+		PublicParentsIds:         node.PublicParentsIds,
+		PublicChildrenIds:        node.PublicChildrenIds,
+		PrivateParentsHashedIds:  privateParentsHashedIds,
+		PrivateChildrenHashedIds: privateChildrenHashedIds,
+		IsFinalized:              node.IsFinalized,
+		NodeType:                 model.ENodeType(node.NodeType),
+		CreatedTime:              node.CreatedTime,
+		UpdatedTime:              node.UpdatedTime,
+		Signature:                node.Signature,
+		OwnerPublicKey:           node.OwnerPublicKey,
 	}
 }

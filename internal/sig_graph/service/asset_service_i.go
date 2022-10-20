@@ -9,6 +9,16 @@ import (
 )
 
 type AssetServiceI interface {
-	CreateAsset(ctx context.Context, MaterialName string, Unit string, Quantity decimal.Decimal, ingredients []model_sig_graph.Asset) (*model_sig_graph.Asset, error)
+	CreateAsset(
+		ctx context.Context,
+		materialName string,
+		unit string,
+		quantity decimal.Decimal,
+		ownerKey *model.UserKeyPair,
+		ingredients []model_sig_graph.Asset,
+		ingredientSecretIds []string,
+		secretIds []string,
+		ingredientSignatures []string,
+	) (*model_sig_graph.Asset, error)
 	GetAssetById(ctx context.Context, Id model.NodeId) (*model_sig_graph.Asset, error)
 }
