@@ -103,18 +103,31 @@ func (c *assetController) CreateAsset(
 
 	secretParentIds := map[string]model.PrivateId{}
 	for i := range ingredients {
-		id := ingredients[i].Id
-		secret := ingredientSecretIds[i]
-		if secret != "" {
-			secretId := fmt.Sprintf("%s%s", id, secret)
-			sum := sha512.Sum512([]byte(secretId))
-			hash := string(sum[:])
+		thisId := ingredients[i].Id
+		thisSecret := ingredientSecretIds[i]
+
+		if thisSecret != "" {
+			thisSecretId := fmt.Sprintf("%s%s", thisId, thisSecret)
+			thisSum := sha512.Sum512([]byte(thisSecretId))
+			thisHash := string(thisSum[:])
+
+			otherId := asset.Id
+			otherSecret := secretIds[i]
+			otherSecretId := fmt.Sprintf("%s%s", otherId, otherSecret)
+			otherSum := sha512.Sum512([]byte(otherSecretId))
+			otherHash := string(otherSum[:])
+
 			privateId := model.PrivateId{
-				Id:     id,
-				Hash:   hash,
-				Secret: secret,
+				ThisId:     thisId,
+				ThisHash:   thisHash,
+				ThisSecret: thisSecret,
+
+				OtherId:     otherId,
+				OtherSecret: otherSecret,
+				OtherHash:   otherHash,
 			}
-			secretParentIds[hash] = privateId
+
+			secretParentIds[thisHash] = privateId
 		}
 	}
 

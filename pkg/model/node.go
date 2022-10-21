@@ -5,9 +5,12 @@ type DbId uint64
 type NodeId string
 
 type PrivateId struct {
-	Id     NodeId `json:"id"`
-	Hash   string `json:"hash"`
-	Secret string `json:"secret"`
+	ThisId      NodeId `json:"this_id"`
+	ThisHash    string `json:"this_hash"`
+	ThisSecret  string `json:"this_secret"`
+	OtherId     NodeId `json:"other_id"`
+	OtherHash   string `json:"other_hash"`
+	OtherSecret string `json:"other_secret"`
 }
 
 type ENodeType string

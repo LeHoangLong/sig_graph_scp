@@ -46,9 +46,14 @@ type gormPublicEdge struct {
 
 type gormPrivateEdge struct {
 	NodeDbId uint64 `gorm:"primaryKey,priority:1"`
-	Hash     string `gorm:"primaryKey,priority:2"`
-	Value    string `gorm:"column:other_node_id"`
-	Secret   string `gorm:"column:other_node_id_secret;not null;default:"`
+
+	ThisId     model.NodeId `gorm:"column:this_node_id"`
+	ThisHash   string       `gorm:"primaryKey,priority:2"`
+	ThisSecret string
+
+	OtherId     model.NodeId `gorm:"column:other_node_id"`
+	OtherHash   string
+	OtherSecret string
 }
 
 func (r *nodeRepositoryGorm) UpsertNode(
@@ -88,18 +93,26 @@ func (r *nodeRepositoryGorm) UpsertNode(
 
 	for _, privateParent := range iNode.PrivateParentsIds {
 		id := gormPrivateEdge{
-			Hash:   privateParent.Hash,
-			Value:  string(privateParent.Id),
-			Secret: privateParent.Secret,
+			ThisId:     privateParent.ThisId,
+			ThisHash:   privateParent.ThisHash,
+			ThisSecret: privateParent.ThisHash,
+
+			OtherId:     privateParent.OtherId,
+			OtherHash:   privateParent.OtherHash,
+			OtherSecret: privateParent.OtherHash,
 		}
 		gormNode.PrivateParentsIds = append(gormNode.PrivateParentsIds, id)
 	}
 
 	for _, privateChildren := range iNode.PrivateChildrenIds {
 		id := gormPrivateEdge{
-			Hash:   privateChildren.Hash,
-			Value:  string(privateChildren.Id),
-			Secret: privateChildren.Secret,
+			ThisId:     privateChildren.ThisId,
+			ThisHash:   privateChildren.ThisHash,
+			ThisSecret: privateChildren.ThisHash,
+
+			OtherId:     privateChildren.OtherId,
+			OtherHash:   privateChildren.OtherHash,
+			OtherSecret: privateChildren.OtherHash,
 		}
 		gormNode.PrivateChildrenIds = append(gormNode.PrivateChildrenIds, id)
 	}
@@ -138,21 +151,29 @@ func gormNodeToModelNode(node gormNode) model.Node {
 	privateParentsIds := map[string]model.PrivateId{}
 	for _, id := range node.PrivateParentsIds {
 		privateId := model.PrivateId{
-			Id:     model.NodeId(id.Value),
-			Hash:   id.Hash,
-			Secret: id.Secret,
+			ThisId:     id.ThisId,
+			ThisHash:   id.ThisHash,
+			ThisSecret: id.ThisHash,
+
+			OtherId:     id.OtherId,
+			OtherHash:   id.OtherHash,
+			OtherSecret: id.OtherHash,
 		}
-		privateParentsIds[id.Hash] = privateId
+		privateParentsIds[id.ThisHash] = privateId
 	}
 
 	privateChildrenIds := map[string]model.PrivateId{}
 	for _, id := range node.PrivateChildrenIds {
 		privateId := model.PrivateId{
-			Id:     model.NodeId(id.Value),
-			Secret: id.Secret,
-			Hash:   id.Hash,
+			ThisId:     id.ThisId,
+			ThisHash:   id.ThisHash,
+			ThisSecret: id.ThisHash,
+
+			OtherId:     id.OtherId,
+			OtherHash:   id.OtherHash,
+			OtherSecret: id.OtherHash,
 		}
-		privateChildrenIds[id.Hash] = privateId
+		privateChildrenIds[id.ThisHash] = privateId
 	}
 
 	modelNode := model.Node{

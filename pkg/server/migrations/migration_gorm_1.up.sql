@@ -19,10 +19,15 @@ CREATE TABLE IF NOT EXISTS gorm_public_edges (
 
 CREATE TABLE IF NOT EXISTS gorm_private_edges (
     node_db_id BIGINT REFERENCES gorm_nodes(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    other_node_hash VARCHAR(1024) NOT NULL, 
+    
+    this_hash VARCHAR(1024) NOT NULL, 
+    this_node_id VARCHAR(1024),
+    this_secret VARCHAR(1024) NOT NULL DEFAULT '',
+
+    other_hash VARCHAR(1024) NOT NULL, 
     other_node_id VARCHAR(1024),
-    other_node_id_secret VARCHAR(1024) NOT NULL DEFAULT '',
-    PRIMARY KEY(node_db_id, other_node_hash)
+    other_secret VARCHAR(1024) NOT NULL DEFAULT '',
+    PRIMARY KEY(node_db_id, this_hash)
 );
 
 CREATE TABLE IF NOT EXISTS gorm_assets (

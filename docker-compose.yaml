@@ -1,7 +1,7 @@
 version: '3.0'
 services:
   server:
-    image: golang:1.19.2-buster
+    image: lehoanglong/go_grpc:1.19
     volumes:
       - ./:/root/server
     network_mode: host

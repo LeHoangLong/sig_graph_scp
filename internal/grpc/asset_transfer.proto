@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+option go_package = "./sig_graph_grpc";
+package sig_graph_grpc;
+
+import "error.proto";
+
+service TransferAsset {
+    rpc RequestToAcceptAsset(RequestToAcceptAssetRequest) returns (RequestToAcceptAssetResponse) {};
+    rpc AcceptAsset(AcceptAssetRequest) returns (AcceptAssetResponse) {};
+}
+
+message SignatureCandidate {
+    string this_secret = 1;
+    string this_signature = 2;
+    string new_id = 3;
+    string new_secret = 4;
+    string new_signature = 5;
+}
+
+message SecretId {
+    string this_id = 1;
+    string this_secret = 2;
+
+    string other_id = 3;
+    string other_secret = 4;
+}
+
+message RequestToAcceptAssetRequest {
+    uint64 time = 1;
+    string asset_id = 2;
+    string owner_public_key = 3;
+    string new_owner_public_key = 4;
+    repeated SignatureCandidate candidates = 5;
+    map<string, SecretId> secret_ids = 6;
+}
+
+message RequestToAcceptAssetResponse {
+    Error error = 1;
+    string ack_id = 2;
+}
+
+message AcceptAssetRequest {
+    string ack_id  = 1;
+    bool accepted = 2;
+    SignatureCandidate selected_id = 3;
+}
+
+message AcceptAssetResponse {}
