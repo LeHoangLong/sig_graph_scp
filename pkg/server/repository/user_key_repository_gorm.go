@@ -2,7 +2,7 @@ package repository_server
 
 import (
 	"context"
-	"sig_graph_scp/pkg/model"
+	model_server "sig_graph_scp/pkg/server/model"
 )
 
 type userKeyRepositoryGorm struct {
@@ -18,9 +18,9 @@ func NewUserKeyRepositoryGorm(
 }
 
 type gormUserKeyPair struct {
-	ID         uint64       `gorm:"primaryKey"`
-	UserId     model.UserId `gorm:"index:user_id_index"`
-	User       model.User   `gorm:"foreignKey:UserId;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ID         uint64              `gorm:"primaryKey"`
+	UserId     model_server.UserId `gorm:"index:user_id_index"`
+	User       model_server.User   `gorm:"foreignKey:UserId;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	PublicKey  string
 	PrivateKey string
 }
@@ -28,22 +28,22 @@ type gormUserKeyPair struct {
 func (r *userKeyRepositoryGorm) FetchKeyPairsOfUser(
 	ctx context.Context,
 	transactionId TransactionId,
-	user *model.User,
-) ([]model.UserKeyPair, error) {
+	user *model_server.User,
+) ([]model_server.UserKeyPair, error) {
 	keyPairs := []gormUserKeyPair{}
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
 	if err != nil {
-		return []model.UserKeyPair{}, err
+		return []model_server.UserKeyPair{}, err
 	}
 
 	err = tx.Where("user_id = ?", user.ID).Find(&keyPairs).Error
 	if err != nil {
-		return []model.UserKeyPair{}, err
+		return []model_server.UserKeyPair{}, err
 	}
 
-	modelKeyPairs := []model.UserKeyPair{}
+	modelKeyPairs := []model_server.UserKeyPair{}
 	for i := range keyPairs {
-		modelKeyPair := model.UserKeyPair{
+		modelKeyPair := model_server.UserKeyPair{
 			Id:      keyPairs[i].ID,
 			Public:  keyPairs[i].PublicKey,
 			Private: keyPairs[i].PrivateKey,
@@ -55,7 +55,7 @@ func (r *userKeyRepositoryGorm) FetchKeyPairsOfUser(
 	return modelKeyPairs, nil
 }
 
-func (r *userKeyRepositoryGorm) AddKeyPairToUser(ctx context.Context, transactionId TransactionId, user *model.User, keyPair *model.UserKeyPair) error {
+func (r *userKeyRepositoryGorm) AddKeyPairToUser(ctx context.Context, transactionId TransactionId, user *model_server.User, keyPair *model_server.UserKeyPair) error {
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
 	if err != nil {
 		return err

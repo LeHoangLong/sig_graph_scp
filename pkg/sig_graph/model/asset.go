@@ -29,24 +29,3 @@ func NewAsset(
 		MaterialName:    materialName,
 	}
 }
-
-func ToModelAsset(asset *Asset, modelNode *model.Node) model.Asset {
-	return model.Asset{
-		Node:            *modelNode,
-		CreationProcess: asset.CreationProcess,
-		Unit:            asset.Unit,
-		Quantity:        asset.Quantity,
-		MaterialName:    asset.MaterialName,
-	}
-}
-
-func FromModelAsset(asset *model.Asset) Asset {
-	node := FromModelNode(&asset.Node)
-	return Asset{
-		Node:            node,
-		CreationProcess: asset.CreationProcess,
-		Unit:            asset.Unit,
-		Quantity:        asset.Quantity,
-		MaterialName:    asset.MaterialName,
-	}
-}

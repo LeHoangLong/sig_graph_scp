@@ -50,7 +50,7 @@ func (s *assetService) CreateAsset(
 	materialName string,
 	unit string,
 	quantity decimal.Decimal,
-	ownerKey *model.UserKeyPair,
+	ownerKey *model_sig_graph.UserKeyPair,
 	ingredients []model_sig_graph.Asset,
 	ingredientSecretIds []string,
 	secretIds []string,
@@ -63,7 +63,10 @@ func (s *assetService) CreateAsset(
 
 	time := s.clock.Now()
 	time_ms := time.UnixMilli()
-	id := s.idGenerateService.NewFullId()
+	id, err := s.idGenerateService.NewFullId(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// generate signature
 	node := model_sig_graph.NewDefaultNode(
@@ -119,7 +122,7 @@ func (s *assetService) CreateAsset(
 	return &assetSigGraph, nil
 }
 
-func (s *assetService) GetAssetById(ctx context.Context, id model.NodeId) (*model_sig_graph.Asset, error) {
+func (s *assetService) GetAssetById(ctx context.Context, id string) (*model_sig_graph.Asset, error) {
 	data, err := s.smartContractService.Query("GetAsset", string(id))
 	if err != nil {
 		return nil, err

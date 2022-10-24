@@ -3,7 +3,7 @@ package model_sig_graph
 import "sig_graph_scp/pkg/model"
 
 type Node struct {
-	Id                       model.NodeId    `json:"id"`
+	Id                       string          `json:"id"`
 	PublicParentsIds         map[string]bool `json:"public_parents_ids"`
 	PublicChildrenIds        map[string]bool `json:"public_children_ids"`
 	PrivateParentsHashedIds  map[string]bool `json:"private_parents_hashed_ids"`
@@ -17,7 +17,7 @@ type Node struct {
 }
 
 func NewDefaultNode(
-	id model.NodeId,
+	id string,
 	nodeType model.ENodeType,
 	createdTime uint64,
 	updatedTime uint64,
@@ -36,48 +36,5 @@ func NewDefaultNode(
 		UpdatedTime:              updatedTime,
 		Signature:                signature,
 		OwnerPublicKey:           ownerPublicKey,
-	}
-}
-
-func ToModelNode(node *Node, dbId model.DbId, namespace string, secretParentIds map[string]model.PrivateId, secretChildrenIds map[string]model.PrivateId) model.Node {
-	return model.Node{
-		DbId:               dbId,
-		Id:                 node.Id,
-		Namespace:          namespace,
-		PublicParentsIds:   node.PublicParentsIds,
-		PublicChildrenIds:  node.PublicChildrenIds,
-		PrivateParentsIds:  secretParentIds,
-		PrivateChildrenIds: secretChildrenIds,
-		IsFinalized:        node.IsFinalized,
-		CreatedTime:        node.CreatedTime,
-		UpdatedTime:        node.UpdatedTime,
-		Signature:          node.Signature,
-		OwnerPublicKey:     node.OwnerPublicKey,
-	}
-}
-
-func FromModelNode(node *model.Node) Node {
-	privateParentsHashedIds := map[string]bool{}
-	for hash := range node.PrivateParentsIds {
-		privateParentsHashedIds[hash] = true
-	}
-
-	privateChildrenHashedIds := map[string]bool{}
-	for hash := range node.PrivateChildrenIds {
-		privateChildrenHashedIds[hash] = true
-	}
-
-	return Node{
-		Id:                       node.Id,
-		PublicParentsIds:         node.PublicParentsIds,
-		PublicChildrenIds:        node.PublicChildrenIds,
-		PrivateParentsHashedIds:  privateParentsHashedIds,
-		PrivateChildrenHashedIds: privateChildrenHashedIds,
-		IsFinalized:              node.IsFinalized,
-		NodeType:                 model.ENodeType(node.NodeType),
-		CreatedTime:              node.CreatedTime,
-		UpdatedTime:              node.UpdatedTime,
-		Signature:                node.Signature,
-		OwnerPublicKey:           node.OwnerPublicKey,
 	}
 }

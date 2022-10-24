@@ -2,7 +2,7 @@ package repository_server
 
 import (
 	"context"
-	"sig_graph_scp/pkg/model"
+	model_server "sig_graph_scp/pkg/server/model"
 
 	"gorm.io/gorm/clause"
 )
@@ -47,11 +47,11 @@ type gormPublicEdge struct {
 type gormPrivateEdge struct {
 	NodeDbId uint64 `gorm:"primaryKey,priority:1"`
 
-	ThisId     model.NodeId `gorm:"column:this_node_id"`
-	ThisHash   string       `gorm:"primaryKey,priority:2"`
+	ThisId     model_server.NodeId `gorm:"column:this_node_id"`
+	ThisHash   string              `gorm:"primaryKey,priority:2"`
 	ThisSecret string
 
-	OtherId     model.NodeId `gorm:"column:other_node_id"`
+	OtherId     model_server.NodeId `gorm:"column:other_node_id"`
 	OtherHash   string
 	OtherSecret string
 }
@@ -59,7 +59,7 @@ type gormPrivateEdge struct {
 func (r *nodeRepositoryGorm) UpsertNode(
 	ctx context.Context,
 	transactionId TransactionId,
-	iNode *model.Node,
+	iNode *model_server.Node,
 ) error {
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
 	if err != nil {
@@ -133,11 +133,11 @@ func (r *nodeRepositoryGorm) UpsertNode(
 		},
 	).Create(&gormNode).Error
 
-	iNode.DbId = model.DbId(gormNode.ID)
+	iNode.DbId = model_server.DbId(gormNode.ID)
 	return err
 }
 
-func gormNodeToModelNode(node gormNode) model.Node {
+func gormNodeToModelNode(node gormNode) model_server.Node {
 	publicParentsIds := map[string]bool{}
 	for _, id := range node.PublicParentsIds {
 		publicParentsIds[id.Value] = true
@@ -148,9 +148,9 @@ func gormNodeToModelNode(node gormNode) model.Node {
 		publicChildrenIds[id.Value] = true
 	}
 
-	privateParentsIds := map[string]model.PrivateId{}
+	privateParentsIds := map[string]model_server.PrivateId{}
 	for _, id := range node.PrivateParentsIds {
-		privateId := model.PrivateId{
+		privateId := model_server.PrivateId{
 			ThisId:     id.ThisId,
 			ThisHash:   id.ThisHash,
 			ThisSecret: id.ThisHash,
@@ -162,9 +162,9 @@ func gormNodeToModelNode(node gormNode) model.Node {
 		privateParentsIds[id.ThisHash] = privateId
 	}
 
-	privateChildrenIds := map[string]model.PrivateId{}
+	privateChildrenIds := map[string]model_server.PrivateId{}
 	for _, id := range node.PrivateChildrenIds {
-		privateId := model.PrivateId{
+		privateId := model_server.PrivateId{
 			ThisId:     id.ThisId,
 			ThisHash:   id.ThisHash,
 			ThisSecret: id.ThisHash,
@@ -176,9 +176,9 @@ func gormNodeToModelNode(node gormNode) model.Node {
 		privateChildrenIds[id.ThisHash] = privateId
 	}
 
-	modelNode := model.Node{
-		DbId:               model.DbId(node.ID),
-		Id:                 model.NodeId(node.NodeID),
+	modelNode := model_server.Node{
+		DbId:               model_server.DbId(node.ID),
+		Id:                 model_server.NodeId(node.NodeID),
 		Namespace:          node.Namespace,
 		PublicParentsIds:   publicParentsIds,
 		PublicChildrenIds:  publicChildrenIds,
@@ -193,17 +193,17 @@ func gormNodeToModelNode(node gormNode) model.Node {
 	return modelNode
 }
 
-func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType string, ownerPublicKey string) ([]model.Node, error) {
+func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType string, ownerPublicKey string) ([]model_server.Node, error) {
 	nodes := []gormNode{}
 
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
 	if err != nil {
-		return []model.Node{}, err
+		return []model_server.Node{}, err
 	}
 
 	tx.Where("owner_public_key = ? AND node_type = ?", ownerPublicKey, nodeType).Order("id asc").Find(&nodes)
 
-	ret := []model.Node{}
+	ret := []model_server.Node{}
 	for i := range nodes {
 		ret = append(ret, gormNodeToModelNode(nodes[i]))
 	}
@@ -216,14 +216,14 @@ func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 	transactionId TransactionId,
 	nodeType string,
 	namespace string,
-	iIds map[model.NodeId]bool,
-) ([]model.Node, error) {
+	iIds map[model_server.NodeId]bool,
+) ([]model_server.Node, error) {
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
 	if err != nil {
-		return []model.Node{}, err
+		return []model_server.Node{}, err
 	}
 
-	ids := []model.NodeId{}
+	ids := []model_server.NodeId{}
 	for id := range iIds {
 		ids = append(ids, id)
 	}
@@ -231,10 +231,10 @@ func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 	nodes := []gormNode{}
 	err = tx.Where("node_namespace = ? AND node_id IN ? AND node_type = ?", namespace, ids, nodeType).Find(&nodes).Error
 	if err != nil {
-		return []model.Node{}, err
+		return []model_server.Node{}, err
 	}
 
-	ret := []model.Node{}
+	ret := []model_server.Node{}
 	for i := range nodes {
 		ret = append(ret, gormNodeToModelNode(nodes[i]))
 	}

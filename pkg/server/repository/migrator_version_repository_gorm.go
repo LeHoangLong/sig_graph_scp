@@ -2,7 +2,7 @@ package repository_server
 
 import (
 	"context"
-	"sig_graph_scp/pkg/model"
+	model_server "sig_graph_scp/pkg/server/model"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -52,10 +52,10 @@ func (r *migratorVersionRepositoryGorm) CreatTableIfNotExists(ctx context.Contex
 	return nil
 }
 
-func (r *migratorVersionRepositoryGorm) GetVerionForUpdate(ctx context.Context, transactionId TransactionId) (model.MigrationVerion, error) {
+func (r *migratorVersionRepositoryGorm) GetVerionForUpdate(ctx context.Context, transactionId TransactionId) (model_server.MigrationVerion, error) {
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
 	if err != nil {
-		return model.MigrationVerion{}, err
+		return model_server.MigrationVerion{}, err
 	}
 
 	version := gormVersionModel{
@@ -66,21 +66,21 @@ func (r *migratorVersionRepositoryGorm) GetVerionForUpdate(ctx context.Context, 
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return model.MigrationVerion{
+			return model_server.MigrationVerion{
 				Major: 0,
 			}, nil
 		} else {
-			return model.MigrationVerion{}, err
+			return model_server.MigrationVerion{}, err
 		}
 	}
 
-	modelVersion := model.MigrationVerion{
+	modelVersion := model_server.MigrationVerion{
 		Major: version.Major,
 	}
 	return modelVersion, nil
 }
 
-func (r *migratorVersionRepositoryGorm) SetVerion(ctx context.Context, transactionId TransactionId, version model.MigrationVerion) error {
+func (r *migratorVersionRepositoryGorm) SetVerion(ctx context.Context, transactionId TransactionId, version model_server.MigrationVerion) error {
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
 	if err != nil {
 		return err

@@ -2,7 +2,7 @@ package repository_server
 
 import (
 	"context"
-	"sig_graph_scp/pkg/model"
+	model_server "sig_graph_scp/pkg/server/model"
 
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -35,7 +35,7 @@ type gormAsset struct {
 	NodeDbId        uint64   `gorm:"primaryKey"`
 }
 
-func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId TransactionId, iAsset *model.Asset) error {
+func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId TransactionId, iAsset *model_server.Asset) error {
 	iAsset.Node.NodeType = "asset"
 	err := r.nodeRepository.UpsertNode(ctx, transactionId, &iAsset.Node)
 	if err != nil {
@@ -58,11 +58,11 @@ func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId Trans
 	return err
 }
 
-func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm.DB, nodes []model.Node) ([]model.Asset, error) {
+func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm.DB, nodes []model_server.Node) ([]model_server.Asset, error) {
 	assets := []gormAsset{}
 
-	nodesIds := make([]model.DbId, 0, len(nodes))
-	nodeIdMap := map[model.DbId]model.Node{}
+	nodesIds := make([]model_server.DbId, 0, len(nodes))
+	nodeIdMap := map[model_server.DbId]model_server.Node{}
 
 	for i := range nodes {
 		nodesIds = append(nodesIds, nodes[i].DbId)
@@ -71,13 +71,13 @@ func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm
 
 	err := tx.Where("node_db_id IN ?", nodesIds).Omit("Node").Order("node_db_id asc").Find(&assets).Error
 	if err != nil {
-		return []model.Asset{}, err
+		return []model_server.Asset{}, err
 	}
 
-	ret := []model.Asset{}
+	ret := []model_server.Asset{}
 	for i := range assets {
-		nodeDbId := model.DbId(assets[i].NodeDbId)
-		asset := model.Asset{
+		nodeDbId := model_server.DbId(assets[i].NodeDbId)
+		asset := model_server.Asset{
 			Node:            nodeIdMap[nodeDbId],
 			CreationProcess: assets[i].CreationProcess,
 			Unit:            assets[i].Unit,
@@ -91,36 +91,36 @@ func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm
 	return ret, nil
 }
 
-func (r *assetRepositoryGorm) FetchAssetsByOwner(ctx context.Context, transactionId TransactionId, namespace string, ownerPublicKey string) ([]model.Asset, error) {
+func (r *assetRepositoryGorm) FetchAssetsByOwner(ctx context.Context, transactionId TransactionId, namespace string, ownerPublicKey string) ([]model_server.Asset, error) {
 	tx, err := r.transactionManagerGorm.GetTransaction(ctx, transactionId)
 	if err != nil {
-		return []model.Asset{}, err
+		return []model_server.Asset{}, err
 	}
 
 	nodes, err := r.nodeRepository.FetchNodesByOwnerPublicKey(ctx, transactionId, "asset", ownerPublicKey)
 
 	ret, err := r.fetchAssetsFromNodes(ctx, tx, nodes)
 	if err != nil {
-		return []model.Asset{}, err
+		return []model_server.Asset{}, err
 	}
 
 	return ret, nil
 }
 
-func (r *assetRepositoryGorm) FetchAssetsByIds(ctx context.Context, transactionId TransactionId, namespace string, iIds map[model.NodeId]bool) ([]model.Asset, error) {
+func (r *assetRepositoryGorm) FetchAssetsByIds(ctx context.Context, transactionId TransactionId, namespace string, iIds map[model_server.NodeId]bool) ([]model_server.Asset, error) {
 	tx, err := r.transactionManagerGorm.GetTransaction(ctx, transactionId)
 	if err != nil {
-		return []model.Asset{}, err
+		return []model_server.Asset{}, err
 	}
 
 	nodes, err := r.nodeRepository.FetchNodesByNodeId(ctx, transactionId, "asset", namespace, iIds)
 	if err != nil {
-		return []model.Asset{}, err
+		return []model_server.Asset{}, err
 	}
 
 	ret, err := r.fetchAssetsFromNodes(ctx, tx, nodes)
 	if err != nil {
-		return []model.Asset{}, err
+		return []model_server.Asset{}, err
 	}
 
 	return ret, nil

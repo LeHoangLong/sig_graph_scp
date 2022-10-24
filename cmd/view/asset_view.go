@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"sig_graph_scp/cmd/middleware"
 	utility "sig_graph_scp/cmd/utility"
-	"sig_graph_scp/pkg/model"
 	controller_server "sig_graph_scp/pkg/server/controller"
+	model_server "sig_graph_scp/pkg/server/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -48,7 +48,7 @@ func (v *assetView) CreateAsset(c *gin.Context) {
 		request.Unit,
 		request.Quantity,
 		request.KeyId,
-		[]model.Asset{},
+		[]model_server.Asset{},
 		[]string{},
 		[]string{},
 		[]string{},
@@ -79,7 +79,7 @@ func (v *assetView) GetAssetById(c *gin.Context) {
 
 	fmt.Printf("request: %v\n", request)
 
-	asset, err := v.controller.GetAssetById(c.Request.Context(), user, model.NodeId(request.AssetId), request.UseCache)
+	asset, err := v.controller.GetAssetById(c.Request.Context(), user, model_server.NodeId(request.AssetId), request.UseCache)
 	if err != nil {
 		utility.AbortWithError(c, err)
 		return

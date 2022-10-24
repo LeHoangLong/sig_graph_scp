@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"sig_graph_scp/cmd/middleware"
 	"sig_graph_scp/cmd/utility"
-	"sig_graph_scp/pkg/model"
 	controller_server "sig_graph_scp/pkg/server/controller"
+	model_server "sig_graph_scp/pkg/server/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -89,7 +89,7 @@ func (v *userKeyPairView) AddUserKeyPairToUser(c *gin.Context) {
 		privateKey = string(data)
 	}
 
-	userKeyPair := &model.UserKeyPair{
+	userKeyPair := &model_server.UserKeyPair{
 		Private: privateKey,
 		Public:  publicKey,
 	}

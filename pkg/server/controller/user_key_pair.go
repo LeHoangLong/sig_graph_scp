@@ -2,7 +2,7 @@ package controller_server
 
 import (
 	"context"
-	"sig_graph_scp/pkg/model"
+	model_server "sig_graph_scp/pkg/server/model"
 	repository_server "sig_graph_scp/pkg/server/repository"
 )
 
@@ -21,7 +21,7 @@ func NewUserKeyPairController(
 	}
 }
 
-func (c *userKeyPairController) FetchKeyPairsByUser(ctx context.Context, user *model.User) ([]model.UserKeyPair, error) {
+func (c *userKeyPairController) FetchKeyPairsByUser(ctx context.Context, user *model_server.User) ([]model_server.UserKeyPair, error) {
 	tx, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (c *userKeyPairController) FetchKeyPairsByUser(ctx context.Context, user *m
 	return keyPairs, nil
 }
 
-func (c *userKeyPairController) AddKeyPairToUser(ctx context.Context, user *model.User, keyPair *model.UserKeyPair) error {
+func (c *userKeyPairController) AddKeyPairToUser(ctx context.Context, user *model_server.User, keyPair *model_server.UserKeyPair) error {
 	tx, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
 		return err

@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"sig_graph_scp/pkg/model"
+	model_sig_graph "sig_graph_scp/pkg/sig_graph/model"
 	"sig_graph_scp/pkg/utility"
 )
 
@@ -23,7 +23,7 @@ func NewNodeSigningService() *nodeSigningService {
 	return &nodeSigningService{}
 }
 
-func (s *nodeSigningService) Sign(ctx context.Context, userKeyPair *model.UserKeyPair, node any) (string, error) {
+func (s *nodeSigningService) Sign(ctx context.Context, userKeyPair *model_sig_graph.UserKeyPair, node any) (string, error) {
 	nodeMap := map[string]any{}
 	nodeJson, err := json.Marshal(node)
 	if err != nil {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"fmt"
-	"sig_graph_scp/pkg/model"
+	model_server "sig_graph_scp/pkg/server/model"
 	repository_server "sig_graph_scp/pkg/server/repository"
 	api_sig_graph "sig_graph_scp/pkg/sig_graph/api"
 	model_sig_graph "sig_graph_scp/pkg/sig_graph/model"
@@ -14,14 +14,14 @@ import (
 )
 
 type assetController struct {
-	api                api_sig_graph.AssetClientApi
+	api                api_sig_graph.SigGraphClientApi
 	repository         repository_server.AssetRepositoryI
 	keyRepository      repository_server.UserKeyRepositoryI
 	transactionManager repository_server.TransactionManagerI
 }
 
 func NewAssetController(
-	api api_sig_graph.AssetClientApi,
+	api api_sig_graph.SigGraphClientApi,
 	repository repository_server.AssetRepositoryI,
 	keyRepository repository_server.UserKeyRepositoryI,
 	transactionManager repository_server.TransactionManagerI,
@@ -36,16 +36,16 @@ func NewAssetController(
 
 func (c *assetController) CreateAsset(
 	ctx context.Context,
-	user *model.User,
+	user *model_server.User,
 	materialName string,
 	unit string,
 	quantity decimal.Decimal,
-	ownerKeyId model.UserKeyPairId,
-	ingredients []model.Asset,
+	ownerKeyId model_server.UserKeyPairId,
+	ingredients []model_server.Asset,
 	ingredientSecretIds []string,
 	secretIds []string,
 	ingredientSignatures []string,
-) (*model.Asset, error) {
+) (*model_server.Asset, error) {
 	if len(ingredients) != len(ingredientSecretIds) {
 		return nil, fmt.Errorf("mismatch length")
 	}
@@ -69,7 +69,7 @@ func (c *assetController) CreateAsset(
 		return nil, err
 	}
 
-	var ownerKey *model.UserKeyPair = nil
+	var ownerKey *model_server.UserKeyPair = nil
 	for i := range ownerKeys {
 		if ownerKeys[i].Id == ownerKeyId {
 			ownerKey = &ownerKeys[i]
@@ -82,7 +82,12 @@ func (c *assetController) CreateAsset(
 
 	sigGraphIngredients := make([]model_sig_graph.Asset, 0, len(ingredients))
 	for i := range ingredients {
-		sigGraphIngredients = append(sigGraphIngredients, model_sig_graph.FromModelAsset(&ingredients[i]))
+		sigGraphIngredients = append(sigGraphIngredients, model_server.ToSigGraphAsset(&ingredients[i]))
+	}
+
+	sigGraphOwnerKeyPair := &model_sig_graph.UserKeyPair{
+		Public:  ownerKey.Public,
+		Private: ownerKey.Private,
 	}
 
 	asset, err := c.api.CreateAsset(
@@ -90,7 +95,7 @@ func (c *assetController) CreateAsset(
 		materialName,
 		unit,
 		quantity,
-		ownerKey,
+		sigGraphOwnerKeyPair,
 		sigGraphIngredients,
 		ingredientSecretIds,
 		secretIds,
@@ -101,7 +106,7 @@ func (c *assetController) CreateAsset(
 		return nil, err
 	}
 
-	secretParentIds := map[string]model.PrivateId{}
+	secretParentIds := map[string]model_server.PrivateId{}
 	for i := range ingredients {
 		thisId := ingredients[i].Id
 		thisSecret := ingredientSecretIds[i]
@@ -117,12 +122,12 @@ func (c *assetController) CreateAsset(
 			otherSum := sha512.Sum512([]byte(otherSecretId))
 			otherHash := string(otherSum[:])
 
-			privateId := model.PrivateId{
+			privateId := model_server.PrivateId{
 				ThisId:     thisId,
 				ThisHash:   thisHash,
 				ThisSecret: thisSecret,
 
-				OtherId:     otherId,
+				OtherId:     model_server.NodeId(otherId),
 				OtherSecret: otherSecret,
 				OtherHash:   otherHash,
 			}
@@ -132,8 +137,8 @@ func (c *assetController) CreateAsset(
 	}
 
 	namespace := fmt.Sprintf("%d", user.ID)
-	modelNode := model_sig_graph.ToModelNode(&asset.Node, 0, namespace, secretParentIds, map[string]model.PrivateId{})
-	modelAsset := model_sig_graph.ToModelAsset(asset, &modelNode)
+	modelNode := model_server.FromSigGraphNode(&asset.Node, 0, namespace, secretParentIds, map[string]model_server.PrivateId{})
+	modelAsset := model_server.FromSigGraphAsset(asset, &modelNode)
 
 	// save asset
 	c.repository.SaveAsset(ctx, transactionId, &modelAsset)
@@ -141,7 +146,7 @@ func (c *assetController) CreateAsset(
 	return &modelAsset, nil
 }
 
-func (c *assetController) GetAssetById(ctx context.Context, user *model.User, id model.NodeId, useCache bool) (*model.Asset, error) {
+func (c *assetController) GetAssetById(ctx context.Context, user *model_server.User, id model_server.NodeId, useCache bool) (*model_server.Asset, error) {
 	var transactionId repository_server.TransactionId
 	var err error
 	if useCache {
@@ -151,7 +156,7 @@ func (c *assetController) GetAssetById(ctx context.Context, user *model.User, id
 		}
 		defer c.transactionManager.StopBypassedTransaction(ctx, transactionId)
 
-		assets, err := c.repository.FetchAssetsByIds(ctx, transactionId, fmt.Sprintf("%d", user.ID), map[model.NodeId]bool{id: true})
+		assets, err := c.repository.FetchAssetsByIds(ctx, transactionId, fmt.Sprintf("%d", user.ID), map[model_server.NodeId]bool{id: true})
 		if err != nil {
 			return nil, err
 		}
@@ -166,15 +171,15 @@ func (c *assetController) GetAssetById(ctx context.Context, user *model.User, id
 		return nil, err
 	}
 
-	modelNode := model_sig_graph.ToModelNode(&asset.Node, 0, fmt.Sprintf("%d", user.ID), map[string]model.PrivateId{}, map[string]model.PrivateId{})
-	modelAsset := model_sig_graph.ToModelAsset(asset, &modelNode)
+	modelNode := model_server.FromSigGraphNode(&asset.Node, 0, fmt.Sprintf("%d", user.ID), map[string]model_server.PrivateId{}, map[string]model_server.PrivateId{})
+	modelAsset := model_server.FromSigGraphAsset(asset, &modelNode)
 
 	c.repository.SaveAsset(ctx, transactionId, &modelAsset)
 
 	return &modelAsset, nil
 }
 
-func (c *assetController) GetOwnedAssetsFromCache(ctx context.Context, user *model.User) ([]model.Asset, error) {
+func (c *assetController) GetOwnedAssetsFromCache(ctx context.Context, user *model_server.User) ([]model_server.Asset, error) {
 	transactionId, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
 		return nil, err
@@ -186,7 +191,7 @@ func (c *assetController) GetOwnedAssetsFromCache(ctx context.Context, user *mod
 		return nil, err
 	}
 
-	ret := []model.Asset{}
+	ret := []model_server.Asset{}
 
 	for _, key := range keys {
 		assets, err := c.repository.FetchAssetsByOwner(ctx, transactionId, fmt.Sprintf("%d", user.ID), key.Public)

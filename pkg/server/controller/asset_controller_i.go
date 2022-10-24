@@ -2,7 +2,7 @@ package controller_server
 
 import (
 	"context"
-	"sig_graph_scp/pkg/model"
+	model_server "sig_graph_scp/pkg/server/model"
 
 	"github.com/shopspring/decimal"
 )
@@ -10,16 +10,16 @@ import (
 type AssetControllerI interface {
 	CreateAsset(
 		ctx context.Context,
-		user *model.User,
+		user *model_server.User,
 		materialName string,
 		unit string,
 		quantity decimal.Decimal,
-		ownerKeyId model.UserKeyPairId,
-		ingredients []model.Asset,
+		ownerKeyId model_server.UserKeyPairId,
+		ingredients []model_server.Asset,
 		ingredientSecretIds []string,
 		secretIds []string,
 		ingredientSignatures []string,
-	) (*model.Asset, error)
-	GetAssetById(ctx context.Context, user *model.User, id model.NodeId, useCache bool) (*model.Asset, error)
-	GetOwnedAssetsFromCache(ctx context.Context, user *model.User) ([]model.Asset, error)
+	) (*model_server.Asset, error)
+	GetAssetById(ctx context.Context, user *model_server.User, id model_server.NodeId, useCache bool) (*model_server.Asset, error)
+	GetOwnedAssetsFromCache(ctx context.Context, user *model_server.User) ([]model_server.Asset, error)
 }

@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"sig_graph_scp/pkg/model"
+	model_server "sig_graph_scp/pkg/server/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,7 +14,7 @@ func NewAuthenticatorSimple() *authenticatorSimple {
 }
 
 func (a *authenticatorSimple) Authenticate(c *gin.Context) {
-	dummyUser := model.User{
+	dummyUser := model_server.User{
 		ID: 1,
 	}
 	ctx := setUser(c.Request.Context(), dummyUser)

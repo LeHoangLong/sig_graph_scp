@@ -11,11 +11,9 @@ service TransferAsset {
 }
 
 message SignatureCandidate {
-    string this_secret = 1;
-    string this_signature = 2;
-    string new_id = 3;
-    string new_secret = 4;
-    string new_signature = 5;
+    string id = 1;
+    string secret = 2;
+    string signature = 3;
 }
 
 message SecretId {
@@ -27,7 +25,7 @@ message SecretId {
 }
 
 message RequestToAcceptAssetRequest {
-    uint64 time = 1;
+    uint64 time_ms = 1;
     string asset_id = 2;
     string owner_public_key = 3;
     string new_owner_public_key = 4;

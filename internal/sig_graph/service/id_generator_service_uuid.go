@@ -1,8 +1,8 @@
 package service_sig_graph
 
 import (
+	"context"
 	"fmt"
-	"sig_graph_scp/pkg/model"
 
 	"github.com/google/uuid"
 )
@@ -15,6 +15,6 @@ func NewIdGenerateServiceUuid(graphName string) *idGenerateServiceUuid {
 	return &idGenerateServiceUuid{graphName: graphName}
 }
 
-func (s *idGenerateServiceUuid) NewFullId() model.NodeId {
-	return model.NodeId(fmt.Sprintf("%s:%s", s.graphName, uuid.New().String()))
+func (s *idGenerateServiceUuid) NewFullId(ctx context.Context) (string, error) {
+	return fmt.Sprintf("%s:%s", s.graphName, uuid.New().String()), nil
 }
