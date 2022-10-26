@@ -103,6 +103,7 @@ func (r *peerRepositoryGorm) FetchPeersByUser(
 	ctx context.Context,
 	txId TransactionId,
 	user *model_server.User,
+	pagination PaginationOption[model_server.PeerDbId],
 ) ([]model_server.Peer, error) {
 	tx, err := r.transactionManagerGorm.GetTransaction(ctx, txId)
 	if err != nil {
@@ -123,8 +124,10 @@ func (r *peerRepositoryGorm) FetchPeersByUser(
 		FROM gorm_peers peer
 			JOIN gorm_peer_protocols protocol 
 			ON peer.protocol_id  = protocol.id 
-		WHERE peer.user_id = ?
-	`, user.ID).Find(&peers).Error
+		WHERE peer.user_id = ? AND peer.id >= ?
+		ORDER BY peer.id ASC
+		LIMIT ?
+	`, user.ID, pagination.MinId, pagination.Limit).Find(&peers).Error
 
 	if err != nil {
 		return nil, err

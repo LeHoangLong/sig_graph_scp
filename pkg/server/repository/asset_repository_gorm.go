@@ -91,13 +91,25 @@ func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm
 	return ret, nil
 }
 
-func (r *assetRepositoryGorm) FetchAssetsByOwner(ctx context.Context, transactionId TransactionId, namespace string, ownerPublicKey string) ([]model_server.Asset, error) {
+func (r *assetRepositoryGorm) FetchAssetsByOwner(
+	ctx context.Context,
+	transactionId TransactionId,
+	namespace string,
+	ownerPublicKey string,
+	pagination PaginationOption[model_server.NodeDbId],
+) ([]model_server.Asset, error) {
 	tx, err := r.transactionManagerGorm.GetTransaction(ctx, transactionId)
 	if err != nil {
 		return []model_server.Asset{}, err
 	}
 
-	nodes, err := r.nodeRepository.FetchNodesByOwnerPublicKey(ctx, transactionId, "asset", ownerPublicKey)
+	nodes, err := r.nodeRepository.FetchNodesByOwnerPublicKey(
+		ctx,
+		transactionId,
+		"asset",
+		ownerPublicKey,
+		pagination,
+	)
 
 	ret, err := r.fetchAssetsFromNodes(ctx, tx, nodes)
 	if err != nil {

@@ -193,7 +193,13 @@ func gormNodeToModelNode(node gormNode) model_server.Node {
 	return modelNode
 }
 
-func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType string, ownerPublicKey string) ([]model_server.Node, error) {
+func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(
+	ctx context.Context,
+	transactionId TransactionId,
+	nodeType string,
+	ownerPublicKey string,
+	pagination PaginationOption[model_server.NodeDbId],
+) ([]model_server.Node, error) {
 	nodes := []gormNode{}
 
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
@@ -201,7 +207,7 @@ func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(ctx context.Context, tra
 		return []model_server.Node{}, err
 	}
 
-	tx.Where("owner_public_key = ? AND node_type = ?", ownerPublicKey, nodeType).Order("id asc").Find(&nodes)
+	tx.Where("owner_public_key = ? AND node_type = ? AND id >= ?", ownerPublicKey, nodeType, pagination.MinId).Limit(int(pagination.Limit)).Order("id asc").Find(&nodes)
 
 	ret := []model_server.Node{}
 	for i := range nodes {
@@ -302,8 +308,8 @@ func (r *nodeRepositoryGorm) FetchPrivateEdgesByNodeIds(
 			e.other_node_id, 
 			e.other_secret, 
 			e.other_hash
-		FROM gorm_private_edge e
-		JOIN gorm_node n
+		FROM gorm_private_edges e
+		JOIN gorm_nodes n
 			ON n.node_namespace = ?
 			AND e.node_db_id = n.id
 		WHERE (e.this_node_id, e.other_node_id) IN ?

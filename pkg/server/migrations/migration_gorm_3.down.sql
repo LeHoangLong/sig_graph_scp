@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS gorm_request_to_accept_asset_exposed_private_ids;
+DROP TABLE IF EXISTS gorm_request_to_accept_assets;

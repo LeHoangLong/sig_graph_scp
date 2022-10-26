@@ -9,6 +9,7 @@ import (
 	"sig_graph_scp/cmd/utility"
 	controller_server "sig_graph_scp/pkg/server/controller"
 	model_server "sig_graph_scp/pkg/server/model"
+	repository_server "sig_graph_scp/pkg/server/repository"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,10 +26,25 @@ func NewUserKeyPairView(
 	}
 }
 
+type GetUserKeyPairsByUserRequest struct {
+	MinId model_server.UserKeyPairId `form:"min_id"`
+	Limit int                        `form:"limit"`
+}
+
 func (v *userKeyPairView) GetUserKeyPairsByUser(c *gin.Context) {
 	user := middleware.GetUser(c.Request.Context())
 
-	userKeyPairs, err := v.controller.FetchKeyPairsByUser(c.Request.Context(), user)
+	request := GetUserKeyPairsByUserRequest{}
+	if err := c.ShouldBind(&request); err != nil {
+		utility.AbortBadRequest(c, err)
+		return
+	}
+
+	pagination := repository_server.PaginationOption[model_server.PeerDbId]{
+		MinId: request.MinId,
+		Limit: request.Limit,
+	}
+	userKeyPairs, err := v.controller.FetchKeyPairsByUser(c.Request.Context(), user, pagination)
 	if err != nil {
 		utility.AbortWithError(c, err)
 		return

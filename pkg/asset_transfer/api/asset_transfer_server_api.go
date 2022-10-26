@@ -11,6 +11,7 @@ import (
 type AssetTransferServerApi interface {
 	// will block, so you should call this function inside a goroutine
 	Start() error
+	GetDefaultBusName() string
 }
 
 type AssetTransferHandlerI interface {
@@ -21,19 +22,23 @@ type AssetTransferServerApiOptions struct {
 	CustomHandlers    []AssetTransferHandlerI
 	BusName           string
 	SigGraphApiClient api_sig_graph.SigGraphClientApi
+	EventBus          EventBus.Bus
 }
 
 type assetTransferServerApi struct {
 	assetTransferServer service_asset_transfer.AssetTransferServerI
+	busName             string
 }
+
+const defaultBusName = "new_request_to_accept_asset_event"
 
 func NewAssetTransferServerApi(
 	serverAddress string,
-	option *AssetTransferServerApiOptions,
+	option AssetTransferServerApiOptions,
 ) (AssetTransferServerApi, error) {
 	multiAssetTransferHandler := service_asset_transfer.NewAssetTransferHandlerMultiple([]service_asset_transfer.AssetTransferHandlerI{})
 	ctx := context.Background()
-	if option != nil && option.CustomHandlers != nil {
+	if option.CustomHandlers != nil {
 		for i := range option.CustomHandlers {
 			err := multiAssetTransferHandler.AddHandler(ctx, option.CustomHandlers[i])
 			if err != nil {
@@ -41,23 +46,31 @@ func NewAssetTransferServerApi(
 			}
 		}
 	} else {
-		busName := "new_request_to_accept_asset_event"
-		if option != nil && option.BusName != "" {
-			busName = option.BusName
-		}
-		bus := EventBus.New()
-
-		eventBus, err := NewAssetTransferHandlerEventBus(bus, busName)
+		var handler AssetTransferHandlerI
+		handler, err := NewAssetTransferHandlerDefault()
 		if err != nil {
 			return nil, err
 		}
 
-		secretIdFilterInvalidHash, err := NewAssetTransferHandlerFilterExposedSecretIdsInvalidHash(eventBus)
+		if option.EventBus != nil {
+			busName := defaultBusName
+			if option.BusName != "" {
+				busName = option.BusName
+			}
+
+			var err error
+			handler, err = NewAssetTransferHandlerEventBus(option.EventBus, busName)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		secretIdFilterInvalidHash, err := NewAssetTransferHandlerFilterExposedSecretIdsInvalidHash(handler)
 		if err != nil {
 			return nil, err
 		}
 
-		if option != nil && option.SigGraphApiClient != nil {
+		if option.SigGraphApiClient != nil {
 			secretIdFilterNotFound, err := NewAssetTransferHandlerFilterExposedSecretIdsNotFound(
 				secretIdFilterInvalidHash,
 				option.SigGraphApiClient,
@@ -86,6 +99,10 @@ func NewAssetTransferServerApi(
 	return &assetTransferServerApi{
 		assetTransferServer: assetTransferServer,
 	}, nil
+}
+
+func (a *assetTransferServerApi) GetDefaultBusName() string {
+	return defaultBusName
 }
 
 func (a *assetTransferServerApi) Start() error {

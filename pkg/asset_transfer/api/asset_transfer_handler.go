@@ -28,3 +28,7 @@ func NewAssetTransferHandlerFilterExposedSecretIdsNotFound(
 		sigGraphClient,
 	), nil
 }
+
+func NewAssetTransferHandlerDefault() (AssetTransferHandlerI, error) {
+	return service_asset_transfer.NewAssetTransferHandlerDefault(), nil
+}

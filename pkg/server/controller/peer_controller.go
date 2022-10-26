@@ -24,6 +24,7 @@ func NewPeerController(
 func (c *peerController) GetPeersByUser(
 	ctx context.Context,
 	user *model_server.User,
+	pagination repository_server.PaginationOption[model_server.PeerDbId],
 ) ([]model_server.Peer, error) {
 	tx, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
@@ -31,7 +32,7 @@ func (c *peerController) GetPeersByUser(
 	}
 	defer c.transactionManager.StopBypassedTransaction(ctx, tx)
 
-	peers, err := c.peerRepository.FetchPeersByUser(ctx, tx, user)
+	peers, err := c.peerRepository.FetchPeersByUser(ctx, tx, user, pagination)
 	if err != nil {
 		return nil, err
 	}

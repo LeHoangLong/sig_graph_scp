@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"fmt"
+	"math"
 	model_server "sig_graph_scp/pkg/server/model"
 	repository_server "sig_graph_scp/pkg/server/repository"
 	api_sig_graph "sig_graph_scp/pkg/sig_graph/api"
@@ -64,7 +65,11 @@ func (c *assetController) CreateAsset(
 	}
 	defer c.transactionManager.StopBypassedTransaction(ctx, transactionId)
 
-	ownerKeys, err := c.keyRepository.FetchKeyPairsOfUser(ctx, transactionId, user)
+	keyPagination := repository_server.PaginationOption[model_server.UserKeyPairId]{
+		MinId: 0,
+		Limit: math.MaxInt,
+	}
+	ownerKeys, err := c.keyRepository.FetchKeyPairsOfUser(ctx, transactionId, user, keyPagination)
 	if err != nil {
 		return nil, err
 	}
@@ -179,22 +184,35 @@ func (c *assetController) GetAssetById(ctx context.Context, user *model_server.U
 	return &modelAsset, nil
 }
 
-func (c *assetController) GetOwnedAssetsFromCache(ctx context.Context, user *model_server.User) ([]model_server.Asset, error) {
+func (c *assetController) GetOwnedAssetsFromCache(
+	ctx context.Context,
+	user *model_server.User,
+	pagination repository_server.PaginationOption[model_server.NodeDbId],
+) ([]model_server.Asset, error) {
 	transactionId, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer c.transactionManager.StopBypassedTransaction(ctx, transactionId)
 
-	keys, err := c.keyRepository.FetchKeyPairsOfUser(ctx, transactionId, user)
+	keyPagination := repository_server.PaginationOption[model_server.UserKeyPairId]{
+		MinId: 0,
+		Limit: math.MaxInt,
+	}
+	keys, err := c.keyRepository.FetchKeyPairsOfUser(ctx, transactionId, user, keyPagination)
 	if err != nil {
 		return nil, err
 	}
 
 	ret := []model_server.Asset{}
-
 	for _, key := range keys {
-		assets, err := c.repository.FetchAssetsByOwner(ctx, transactionId, fmt.Sprintf("%d", user.ID), key.Public)
+		remainingLimit := pagination.Limit - len(ret)
+
+		assetPagination := repository_server.PaginationOption[model_server.NodeDbId]{
+			MinId: pagination.MinId,
+			Limit: remainingLimit,
+		}
+		assets, err := c.repository.FetchAssetsByOwner(ctx, transactionId, fmt.Sprintf("%d", user.ID), key.Public, assetPagination)
 		if err != nil {
 			return nil, err
 		}

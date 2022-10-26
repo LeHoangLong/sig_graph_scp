@@ -7,6 +7,6 @@ import (
 
 type PeerRepositoryI interface {
 	FetchPeerById(ctx context.Context, txId TransactionId, id model_server.PeerDbId) (*model_server.Peer, error)
-	FetchPeersByUser(ctx context.Context, txId TransactionId, user *model_server.User) ([]model_server.Peer, error)
+	FetchPeersByUser(ctx context.Context, txId TransactionId, user *model_server.User, pagination PaginationOption[model_server.PeerDbId]) ([]model_server.Peer, error)
 	AddPeerToUser(ctx context.Context, txId TransactionId, peer *model_server.Peer) error
 }

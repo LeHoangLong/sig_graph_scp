@@ -3,6 +3,9 @@ package repository_server
 import (
 	"context"
 	model_server "sig_graph_scp/pkg/server/model"
+	"sig_graph_scp/pkg/utility"
+
+	"gorm.io/gorm"
 )
 
 type userKeyRepositoryGorm struct {
@@ -29,6 +32,7 @@ func (r *userKeyRepositoryGorm) FetchKeyPairsOfUser(
 	ctx context.Context,
 	transactionId TransactionId,
 	user *model_server.User,
+	pagination PaginationOption[model_server.UserKeyPairId],
 ) ([]model_server.UserKeyPair, error) {
 	keyPairs := []gormUserKeyPair{}
 	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
@@ -36,7 +40,7 @@ func (r *userKeyRepositoryGorm) FetchKeyPairsOfUser(
 		return []model_server.UserKeyPair{}, err
 	}
 
-	err = tx.Where("user_id = ?", user.ID).Find(&keyPairs).Error
+	err = tx.Where("user_id = ? AND id >= ?", user.ID, pagination.MinId).Order("id asc").Limit(pagination.Limit).Find(&keyPairs).Error
 	if err != nil {
 		return []model_server.UserKeyPair{}, err
 	}
@@ -69,4 +73,30 @@ func (r *userKeyRepositoryGorm) AddKeyPairToUser(ctx context.Context, transactio
 
 	err = tx.Omit("User").Create(&gormKeyPair).Error
 	return err
+}
+
+func (r *userKeyRepositoryGorm) FetchUserWithPublicKey(
+	ctx context.Context,
+	transactionId TransactionId,
+	publicKey string,
+) (*model_server.User, error) {
+	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
+	if err != nil {
+		return nil, err
+	}
+
+	gormKeyPair := gormUserKeyPair{}
+
+	err = tx.Where("public_key = ?", publicKey).First(&gormKeyPair).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, utility.ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return &model_server.User{
+		ID: gormKeyPair.UserId,
+	}, nil
 }

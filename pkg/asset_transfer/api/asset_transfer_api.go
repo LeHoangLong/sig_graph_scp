@@ -31,7 +31,7 @@ type assetTransferServiceApi struct {
 	assetTransferService service_asset_transfer.AssetTransferServiceI
 }
 
-func NewAssetTransferServiceApi(graphName string, options *Options) AssetTransferServiceApi {
+func NewAssetTransferServiceApi(graphName string, options *Options) (AssetTransferServiceApi, error) {
 	connPool := utility.NewGrpcConnectionPool()
 	numberOfCandidates := uint32(6)
 	if options != nil {
@@ -51,7 +51,7 @@ func NewAssetTransferServiceApi(graphName string, options *Options) AssetTransfe
 
 	return &assetTransferServiceApi{
 		assetTransferService: assetTransferService,
-	}
+	}, nil
 }
 
 func (s *assetTransferServiceApi) TransferAsset(

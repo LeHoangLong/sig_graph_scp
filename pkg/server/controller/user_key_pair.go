@@ -21,14 +21,14 @@ func NewUserKeyPairController(
 	}
 }
 
-func (c *userKeyPairController) FetchKeyPairsByUser(ctx context.Context, user *model_server.User) ([]model_server.UserKeyPair, error) {
+func (c *userKeyPairController) FetchKeyPairsByUser(ctx context.Context, user *model_server.User, pagination repository_server.PaginationOption[model_server.UserKeyPairId]) ([]model_server.UserKeyPair, error) {
 	tx, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer c.transactionManager.StopBypassedTransaction(ctx, tx)
 
-	keyPairs, err := c.repository.FetchKeyPairsOfUser(ctx, tx, user)
+	keyPairs, err := c.repository.FetchKeyPairsOfUser(ctx, tx, user, pagination)
 	if err != nil {
 		return nil, err
 	}
