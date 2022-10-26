@@ -25,9 +25,6 @@ func main() {
 
 	router := gin.Default()
 
-	// middleware
-	authenticator := middleware.NewAuthenticatorSimple()
-
 	// api
 
 	// init db
@@ -56,7 +53,7 @@ func main() {
 	migrator := repository_server.NewMigratorGorm(&versionRepository, transactionManager)
 	{
 		ctx := context.Background()
-		err := migrator.Up(ctx, 1)
+		err := migrator.Up(ctx, 2)
 		if err != nil {
 			panic(fmt.Sprintf("could not migrate database: %s", err))
 		}
@@ -66,21 +63,23 @@ func main() {
 	nodeRepository := repository_server.NewNodeRepositoryGorm(transactionManager)
 	assetRepository := repository_server.NewAssetRepositoryGorm(transactionManager, nodeRepository)
 	userKeyPairRepository := repository_server.NewUserKeyRepositoryGorm(transactionManager)
+	peerRepository := repository_server.NewPeerRepositoryGorm(transactionManager)
 
 	// controller
 	assetController := controller_server.NewAssetController(assetApi, assetRepository, userKeyPairRepository, transactionManager)
 	userKeyPairController := controller_server.NewUserKeyPairController(userKeyPairRepository, transactionManager)
+	peerController := controller_server.NewPeerController(transactionManager, peerRepository)
 
 	// view
 	assetView := view.NewAssetView(assetController)
 	userKeyPairView := view.NewUserKeyPairView(userKeyPairController)
+	peerView := view.NewPeerView(peerController)
 
 	//authenticator
 	auth := middleware.NewAuthenticatorSimple()
 
 	// api
 	api := router.Group("/api")
-	api.Use(authenticator.Authenticate)
 	{
 		// asset
 		api.GET("/assets", auth.Authenticate, assetView.GetAssetById)
@@ -89,6 +88,10 @@ func main() {
 		// user key pair
 		api.GET("/key_pairs", auth.Authenticate, userKeyPairView.GetUserKeyPairsByUser)
 		api.POST("/key_pairs", auth.Authenticate, userKeyPairView.AddUserKeyPairToUser)
+
+		// peers
+		api.GET("/peers", auth.Authenticate, peerView.GetPeers)
+		api.POST("/peers", auth.Authenticate, peerView.CreatePeer)
 	}
 
 	router.NoRoute(func(ctx *gin.Context) { ctx.JSON(http.StatusNotFound, gin.H{}) })

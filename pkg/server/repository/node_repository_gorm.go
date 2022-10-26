@@ -133,7 +133,7 @@ func (r *nodeRepositoryGorm) UpsertNode(
 		},
 	).Create(&gormNode).Error
 
-	iNode.DbId = model_server.DbId(gormNode.ID)
+	iNode.NodeDbId = model_server.NodeDbId(gormNode.ID)
 	return err
 }
 
@@ -177,7 +177,7 @@ func gormNodeToModelNode(node gormNode) model_server.Node {
 	}
 
 	modelNode := model_server.Node{
-		DbId:               model_server.DbId(node.ID),
+		NodeDbId:           model_server.NodeDbId(node.ID),
 		Id:                 model_server.NodeId(node.NodeID),
 		Namespace:          node.Namespace,
 		PublicParentsIds:   publicParentsIds,
@@ -240,4 +240,89 @@ func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 	}
 
 	return ret, nil
+}
+
+func (r *nodeRepositoryGorm) FetchNodesByDbId(
+	ctx context.Context,
+	transactionId TransactionId,
+	nodeType string,
+	namespace string,
+	iIds map[model_server.NodeDbId]bool,
+) ([]model_server.Node, error) {
+	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
+	if err != nil {
+		return []model_server.Node{}, err
+	}
+
+	ids := []model_server.NodeDbId{}
+	for id := range iIds {
+		ids = append(ids, id)
+	}
+
+	nodes := []gormNode{}
+	err = tx.Where("node_namespace = ? AND id IN ? AND node_type = ?", namespace, ids, nodeType).Find(&nodes).Error
+	if err != nil {
+		return []model_server.Node{}, err
+	}
+
+	ret := []model_server.Node{}
+	for i := range nodes {
+		ret = append(ret, gormNodeToModelNode(nodes[i]))
+	}
+
+	return ret, nil
+}
+
+func (r *nodeRepositoryGorm) FetchPrivateEdgesByNodeIds(
+	ctx context.Context,
+	transactionId TransactionId,
+	namespace string,
+	edges []EdgeNodeId,
+) ([]model_server.PrivateId, error) {
+	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
+	if err != nil {
+		return nil, err
+	}
+
+	edgeTuple := make([][2]string, 0, len(edges))
+	for i := range edges {
+		edgeTuple = append(edgeTuple, [2]string{
+			string(edges[i].Parent),
+			string(edges[i].Child),
+		})
+	}
+
+	gormPrivateEdges := []gormPrivateEdge{}
+	err = tx.Raw(`
+		SELECT 
+			e.node_db_id,
+			e.this_node_id, 
+			e.this_secret, 
+			e.this_hash,
+			e.other_node_id, 
+			e.other_secret, 
+			e.other_hash
+		FROM gorm_private_edge e
+		JOIN gorm_node n
+			ON n.node_namespace = ?
+			AND e.node_db_id = n.id
+		WHERE (e.this_node_id, e.other_node_id) IN ?
+	`, namespace, edgeTuple).Scan(&gormPrivateEdges).Error
+	if err != nil {
+		return nil, err
+	}
+
+	privateEdges := make([]model_server.PrivateId, 0, len(gormPrivateEdges))
+	for i := range gormPrivateEdges {
+		privateEdges = append(privateEdges, model_server.PrivateId{
+			ThisId:     gormPrivateEdges[i].ThisId,
+			ThisSecret: gormPrivateEdges[i].ThisSecret,
+			ThisHash:   gormPrivateEdges[i].ThisHash,
+
+			OtherId:     gormPrivateEdges[i].OtherId,
+			OtherSecret: gormPrivateEdges[i].OtherSecret,
+			OtherHash:   gormPrivateEdges[i].OtherHash,
+		})
+	}
+	return privateEdges, nil
 }

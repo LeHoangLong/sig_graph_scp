@@ -37,7 +37,7 @@ func (p *grpcConnectionPool) NewConnection(
 		p.connections[url] = []*grpc.ClientConn{}
 	}
 
-	clientConn, err := grpc.DialContext(ctx, url, grpc.WithBlock)
+	clientConn, err := grpc.DialContext(ctx, url, grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}

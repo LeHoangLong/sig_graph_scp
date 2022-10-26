@@ -52,7 +52,7 @@ func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId Trans
 		Unit:            iAsset.Unit,
 		Quantity:        iAsset.Quantity,
 		MaterialName:    iAsset.MaterialName,
-		NodeDbId:        uint64(iAsset.DbId),
+		NodeDbId:        uint64(iAsset.NodeDbId),
 	}
 	err = tx.Omit(clause.Associations).Create(&asset).Error
 	return err
@@ -61,12 +61,12 @@ func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId Trans
 func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm.DB, nodes []model_server.Node) ([]model_server.Asset, error) {
 	assets := []gormAsset{}
 
-	nodesIds := make([]model_server.DbId, 0, len(nodes))
-	nodeIdMap := map[model_server.DbId]model_server.Node{}
+	nodesIds := make([]model_server.NodeDbId, 0, len(nodes))
+	nodeIdMap := map[model_server.NodeDbId]model_server.Node{}
 
 	for i := range nodes {
-		nodesIds = append(nodesIds, nodes[i].DbId)
-		nodeIdMap[nodes[i].DbId] = nodes[i]
+		nodesIds = append(nodesIds, nodes[i].NodeDbId)
+		nodeIdMap[nodes[i].NodeDbId] = nodes[i]
 	}
 
 	err := tx.Where("node_db_id IN ?", nodesIds).Omit("Node").Order("node_db_id asc").Find(&assets).Error
@@ -76,7 +76,7 @@ func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm
 
 	ret := []model_server.Asset{}
 	for i := range assets {
-		nodeDbId := model_server.DbId(assets[i].NodeDbId)
+		nodeDbId := model_server.NodeDbId(assets[i].NodeDbId)
 		asset := model_server.Asset{
 			Node:            nodeIdMap[nodeDbId],
 			CreationProcess: assets[i].CreationProcess,
@@ -107,13 +107,32 @@ func (r *assetRepositoryGorm) FetchAssetsByOwner(ctx context.Context, transactio
 	return ret, nil
 }
 
-func (r *assetRepositoryGorm) FetchAssetsByIds(ctx context.Context, transactionId TransactionId, namespace string, iIds map[model_server.NodeId]bool) ([]model_server.Asset, error) {
+func (r *assetRepositoryGorm) FetchAssetsByIds(ctx context.Context, transactionId TransactionId, namespace string, ids map[model_server.NodeId]bool) ([]model_server.Asset, error) {
 	tx, err := r.transactionManagerGorm.GetTransaction(ctx, transactionId)
 	if err != nil {
 		return []model_server.Asset{}, err
 	}
 
-	nodes, err := r.nodeRepository.FetchNodesByNodeId(ctx, transactionId, "asset", namespace, iIds)
+	nodes, err := r.nodeRepository.FetchNodesByNodeId(ctx, transactionId, "asset", namespace, ids)
+	if err != nil {
+		return []model_server.Asset{}, err
+	}
+
+	ret, err := r.fetchAssetsFromNodes(ctx, tx, nodes)
+	if err != nil {
+		return []model_server.Asset{}, err
+	}
+
+	return ret, nil
+}
+
+func (r *assetRepositoryGorm) FetchAssetsByDbIds(ctx context.Context, transactionId TransactionId, namespace string, ids map[model_server.NodeDbId]bool) ([]model_server.Asset, error) {
+	tx, err := r.transactionManagerGorm.GetTransaction(ctx, transactionId)
+	if err != nil {
+		return []model_server.Asset{}, err
+	}
+
+	nodes, err := r.nodeRepository.FetchNodesByDbId(ctx, transactionId, "asset", namespace, ids)
 	if err != nil {
 		return []model_server.Asset{}, err
 	}

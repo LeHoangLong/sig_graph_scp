@@ -1,11 +1,12 @@
 package model_server
 
 import (
+	model_asset_transfer "sig_graph_scp/pkg/asset_transfer/model"
 	"sig_graph_scp/pkg/model"
 	model_sig_graph "sig_graph_scp/pkg/sig_graph/model"
 )
 
-type DbId uint64
+type NodeDbId uint64
 
 type NodeId string
 
@@ -19,7 +20,7 @@ type PrivateId struct {
 }
 
 type Node struct {
-	DbId DbId `json:"db_id"`
+	NodeDbId NodeDbId `json:"db_id"`
 
 	Id        NodeId `json:"id"`
 	Namespace string `json:"-"`
@@ -38,9 +39,20 @@ type Node struct {
 	OwnerPublicKey string `json:"owner_public_key"`
 }
 
-func FromSigGraphNode(node *model_sig_graph.Node, dbId DbId, namespace string, secretParentIds map[string]PrivateId, secretChildrenIds map[string]PrivateId) Node {
+func ToAssetTransferPrivateId(privateId *PrivateId) model_asset_transfer.PrivateId {
+	return model_asset_transfer.PrivateId{
+		ThisId:      string(privateId.ThisId),
+		ThisSecret:  privateId.ThisSecret,
+		ThisHash:    privateId.ThisHash,
+		OtherId:     string(privateId.OtherId),
+		OtherSecret: privateId.OtherSecret,
+		OtherHash:   privateId.OtherHash,
+	}
+}
+
+func FromSigGraphNode(node *model_sig_graph.Node, dbId NodeDbId, namespace string, secretParentIds map[string]PrivateId, secretChildrenIds map[string]PrivateId) Node {
 	return Node{
-		DbId:               dbId,
+		NodeDbId:           dbId,
 		Id:                 NodeId(node.Id),
 		Namespace:          namespace,
 		PublicParentsIds:   node.PublicParentsIds,

@@ -106,7 +106,7 @@ func (m *migratorGorm) Down(ctx context.Context, targetVersion uint32) error {
 		return err
 	}
 
-	for i := currentVersion; i >= int(targetVersion) && i > 0; i-- {
+	for i := currentVersion; i > int(targetVersion) && i > 0; i-- {
 		err := func() error {
 			txId, err := m.transactionManager.StartTransaction(ctx, &TransactionOption{
 				IsolationLevel: EIsolationLevelSerializable,
