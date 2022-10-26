@@ -158,6 +158,7 @@ func main() {
 
 		// asset transfer
 		api.POST("/asset_accept_requests", auth.Authenticate, assetTransferView.CreateRequestToAcceptAsset)
+		api.GET("/asset_accept_requests", auth.Authenticate, assetTransferView.GetReceivedRequestToAcceptAsset)
 	}
 
 	router.NoRoute(func(ctx *gin.Context) { ctx.JSON(http.StatusNotFound, gin.H{}) })

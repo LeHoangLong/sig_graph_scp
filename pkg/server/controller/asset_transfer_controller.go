@@ -247,3 +247,29 @@ func (c *assetTransferController) newAcceptAssetRequestReceivedHandler(
 
 	fmt.Printf("saved %+v\n", assetTransferRequest)
 }
+
+func (c *assetTransferController) GetReceivedRequestsToAcceptAsset(
+	ctx context.Context,
+	user *model_server.User,
+	status model.ERequestToAcceptAssetStatus,
+	pagination repository_server.PaginationOption[model_server.RequestId],
+) ([]model_server.RequestToAcceptAsset, error) {
+	txId, err := c.transactionManager.BypassTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer c.transactionManager.StopBypassedTransaction(ctx, txId)
+
+	requests, err := c.assetTransferRepository.FetchAssetAcceptRequestsByUserAndStatus(
+		ctx,
+		txId,
+		user,
+		status,
+		pagination,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return requests, nil
+}

@@ -26,7 +26,7 @@ type NodeEdge struct {
 	Child  string `json:"child"`
 }
 
-type CreateRequestToAcceptAsset struct {
+type CreateRequestToAcceptAssetRequest struct {
 	AssetId                        uint64     `json:"asset_id"`
 	PeerId                         uint64     `json:"peer_id"`
 	Edges                          []NodeEdge `json:"edges"`
@@ -37,7 +37,7 @@ func (v *assetTransferView) CreateRequestToAcceptAsset(c *gin.Context) {
 	ctx := c.Request.Context()
 	user := middleware.GetUser(c.Request.Context())
 
-	request := CreateRequestToAcceptAsset{}
+	request := CreateRequestToAcceptAssetRequest{}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		utility.AbortBadRequest(c, err)
 		return
@@ -66,5 +66,41 @@ func (v *assetTransferView) CreateRequestToAcceptAsset(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, requestToAcceptAsset)
+	return
+}
+
+type GetReceivedRequestToAcceptAssetRequest struct {
+	Status string                 `form:"status"`
+	MinId  model_server.RequestId `form:"min_id"`
+	Limit  int                    `form:"limit"`
+}
+
+func (v *assetTransferView) GetReceivedRequestToAcceptAsset(c *gin.Context) {
+	ctx := c.Request.Context()
+	user := middleware.GetUser(c.Request.Context())
+
+	request := GetReceivedRequestToAcceptAssetRequest{}
+	if err := c.ShouldBind(&request); err != nil {
+		utility.AbortBadRequest(c, err)
+		return
+	}
+
+	pagination := repository_server.PaginationOption[model_server.RequestId]{
+		Limit: request.Limit,
+		MinId: request.MinId,
+	}
+
+	requestToAcceptAssets, err := v.controller.GetReceivedRequestsToAcceptAsset(
+		ctx,
+		user,
+		request.Status,
+		pagination,
+	)
+	if err != nil {
+		utility.AbortWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, requestToAcceptAssets)
 	return
 }
