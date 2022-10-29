@@ -17,12 +17,24 @@ type AssetTransferControllerI interface {
 		isNewConnectionPublicOrPrivate bool,
 	) (*model_server.RequestToAcceptAsset, error)
 
-	GetReceivedRequestsToAcceptAsset(
+	GetRequestsToAcceptAsset(
 		ctx context.Context,
 		user *model_server.User,
 		status model.ERequestToAcceptAssetStatus,
+		inboundOrOutbound bool,
 		pagination repository_server.PaginationOption[model_server.RequestId],
 	) ([]model_server.RequestToAcceptAsset, error)
+
+	AcceptReceivedRequestsToAcceptAsset(
+		ctx context.Context,
+		user *model_server.User,
+		keyPairId model_server.UserKeyPairId,
+		requestId model_server.RequestId,
+		acceptOrRejct bool,
+		message string,
+		isNewConnectionSecretOrPublic bool,
+		toInformSenderOfNewId bool,
+	) (*model_server.RequestToAcceptAsset, error)
 
 	/*
 
@@ -32,11 +44,6 @@ type AssetTransferControllerI interface {
 			status model.ERequestToAcceptAssetStatus,
 		) ([]model_server.RequestToAcceptAsset, error)
 
-		AcceptReceivedRequestsToAcceptAsset(
-			ctx context.Context,
-			user *model_server.User,
-			requestId model_server.RequestId,
-		) (model_server.RequestToAcceptAsset, error)
 
 		RejectReceivedRequestsToAcceptAsset(
 			ctx context.Context,

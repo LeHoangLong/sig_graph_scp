@@ -25,6 +25,16 @@ type SigGraphClientApi interface {
 	) (*model_sig_graph.Asset, error)
 	GetAssetById(ctx context.Context, Id model_server.NodeId) (*model_sig_graph.Asset, error)
 	DoNodeIdsExists(ctx context.Context, ids map[string]bool) (map[string]bool, error)
+	TransferAsset(
+		ctx context.Context,
+		time_ms uint64,
+		asset *model_sig_graph.Asset,
+		newOwnerKey *model_sig_graph.UserKeyPair,
+		newId string,
+		newSecret string,
+		currentSecret string,
+		currentSignature string,
+	) (*model_sig_graph.Asset, error)
 }
 
 type sigGraphClientApi struct {
@@ -80,4 +90,26 @@ func (a *sigGraphClientApi) CreateAsset(
 
 func (a *sigGraphClientApi) GetAssetById(ctx context.Context, Id model_server.NodeId) (*model_sig_graph.Asset, error) {
 	return a.assetService.GetAssetById(ctx, string(Id))
+}
+
+func (a *sigGraphClientApi) TransferAsset(
+	ctx context.Context,
+	time_ms uint64,
+	asset *model_sig_graph.Asset,
+	newOwnerKey *model_sig_graph.UserKeyPair,
+	newId string,
+	newSecret string,
+	currentSecret string,
+	currentSignature string,
+) (*model_sig_graph.Asset, error) {
+	return a.assetService.TransferAsset(
+		ctx,
+		time_ms,
+		asset,
+		newOwnerKey,
+		newId,
+		newSecret,
+		currentSecret,
+		currentSignature,
+	)
 }

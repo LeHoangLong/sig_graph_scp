@@ -20,4 +20,15 @@ type AssetServiceI interface {
 		ingredientSignatures []string,
 	) (*model_sig_graph.Asset, error)
 	GetAssetById(ctx context.Context, Id string) (*model_sig_graph.Asset, error)
+
+	TransferAsset(
+		ctx context.Context,
+		time_ms uint64,
+		asset *model_sig_graph.Asset,
+		newOwnerKey *model_sig_graph.UserKeyPair,
+		newId string,
+		newSecret string,
+		currentSecret string,
+		currentSignature string,
+	) (*model_sig_graph.Asset, error)
 }

@@ -21,7 +21,13 @@ type AssetControllerI interface {
 		secretIds []string,
 		ingredientSignatures []string,
 	) (*model_server.Asset, error)
-	GetAssetById(ctx context.Context, user *model_server.User, id model_server.NodeId, useCache bool) (*model_server.Asset, error)
+	GetAssetById(
+		ctx context.Context,
+		user *model_server.User,
+		id model_server.NodeId,
+		useCache bool,
+	) (*model_server.Asset, error)
+
 	GetOwnedAssetsFromCache(
 		ctx context.Context,
 		user *model_server.User,

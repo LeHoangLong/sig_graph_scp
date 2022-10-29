@@ -54,7 +54,14 @@ func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId Trans
 		MaterialName:    iAsset.MaterialName,
 		NodeDbId:        uint64(iAsset.NodeDbId),
 	}
-	err = tx.Omit(clause.Associations).Create(&asset).Error
+	err = tx.Clauses(
+		clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "node_db_id"},
+			},
+			UpdateAll: true,
+		},
+	).Omit(clause.Associations).Create(&asset).Error
 	return err
 }
 

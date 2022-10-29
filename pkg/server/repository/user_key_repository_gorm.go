@@ -47,12 +47,7 @@ func (r *userKeyRepositoryGorm) FetchKeyPairsOfUser(
 
 	modelKeyPairs := []model_server.UserKeyPair{}
 	for i := range keyPairs {
-		modelKeyPair := model_server.UserKeyPair{
-			Id:      keyPairs[i].ID,
-			Public:  keyPairs[i].PublicKey,
-			Private: keyPairs[i].PrivateKey,
-		}
-
+		modelKeyPair := toModelKeyPair(&keyPairs[i])
 		modelKeyPairs = append(modelKeyPairs, modelKeyPair)
 	}
 
@@ -99,4 +94,43 @@ func (r *userKeyRepositoryGorm) FetchUserWithPublicKey(
 	return &model_server.User{
 		ID: gormKeyPair.UserId,
 	}, nil
+}
+
+func (r *userKeyRepositoryGorm) FetchKeyPairsByIds(
+	ctx context.Context,
+	transactionId TransactionId,
+	user *model_server.User,
+	iId map[model_server.UserKeyPairId]bool,
+) ([]model_server.UserKeyPair, error) {
+	tx, err := r.transactionManager.GetTransaction(ctx, transactionId)
+	if err != nil {
+		return nil, err
+	}
+
+	gormKeyPairs := []gormUserKeyPair{}
+
+	ids := []model_server.UserKeyPairId{}
+	for id := range iId {
+		ids = append(ids, id)
+	}
+
+	err = tx.Where("user_id = ? AND id IN ?", user.ID, ids).Find(&gormKeyPairs).Error
+
+	ret := make([]model_server.UserKeyPair, 0, len(gormKeyPairs))
+	for i := range gormKeyPairs {
+		ret = append(ret, toModelKeyPair(&gormKeyPairs[i]))
+	}
+
+	return ret, nil
+}
+
+func toModelKeyPair(
+	keyPair *gormUserKeyPair,
+) model_server.UserKeyPair {
+	return model_server.UserKeyPair{
+		Id:      keyPair.ID,
+		Public:  keyPair.PublicKey,
+		Private: keyPair.PrivateKey,
+	}
+
 }

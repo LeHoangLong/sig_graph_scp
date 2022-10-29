@@ -70,9 +70,10 @@ func (v *assetTransferView) CreateRequestToAcceptAsset(c *gin.Context) {
 }
 
 type GetReceivedRequestToAcceptAssetRequest struct {
-	Status string                 `form:"status"`
-	MinId  model_server.RequestId `form:"min_id"`
-	Limit  int                    `form:"limit"`
+	Status            string                 `form:"status"`
+	OutboundOrInbound bool                   `form:"outbound_or_inbound"`
+	MinId             model_server.RequestId `form:"min_id"`
+	Limit             int                    `form:"limit"`
 }
 
 func (v *assetTransferView) GetReceivedRequestToAcceptAsset(c *gin.Context) {
@@ -90,17 +91,57 @@ func (v *assetTransferView) GetReceivedRequestToAcceptAsset(c *gin.Context) {
 		MinId: request.MinId,
 	}
 
-	requestToAcceptAssets, err := v.controller.GetReceivedRequestsToAcceptAsset(
+	requestToAcceptAssets, err := v.controller.GetRequestsToAcceptAsset(
 		ctx,
 		user,
 		request.Status,
+		request.OutboundOrInbound,
 		pagination,
 	)
+
 	if err != nil {
 		utility.AbortWithError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, requestToAcceptAssets)
+	return
+}
+
+type AcceptReceivedRequestToAcceptAssetRequest struct {
+	RequestId             model_server.RequestId     `json:"request_id"`
+	KeyPairId             model_server.UserKeyPairId `json:"key_id"`
+	Accept                bool                       `json:"accept"`
+	Message               string                     `json:"message"`
+	IsNewConnectionSecret bool                       `json:"is_connection_secret"`
+	ToInformSenderOfNewId bool                       `json:"to_inform_sender_of_new_id"`
+}
+
+func (v *assetTransferView) AcceptReceivedRequestToAcceptAsset(c *gin.Context) {
+	ctx := c.Request.Context()
+	user := middleware.GetUser(c.Request.Context())
+
+	request := AcceptReceivedRequestToAcceptAssetRequest{}
+	if err := c.ShouldBind(&request); err != nil {
+		utility.AbortBadRequest(c, err)
+		return
+	}
+
+	requestToAcceptAsset, err := v.controller.AcceptReceivedRequestsToAcceptAsset(
+		ctx,
+		user,
+		request.KeyPairId,
+		request.RequestId,
+		request.Accept,
+		request.Message,
+		request.IsNewConnectionSecret,
+		request.ToInformSenderOfNewId,
+	)
+	if err != nil {
+		utility.AbortWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, requestToAcceptAsset)
 	return
 }

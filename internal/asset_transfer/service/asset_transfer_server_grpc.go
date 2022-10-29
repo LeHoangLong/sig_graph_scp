@@ -17,32 +17,43 @@ import (
 
 type assetTransferServerGrpc struct {
 	sig_graph_grpc.UnimplementedTransferAssetServer
-	mtx     utility.MutexI
-	handler AssetTransferHandlerI
-	address string
+	mtx                    utility.MutexI
+	requestToAcceptHandler AssetTransferHandlerI
+	assetAcceptHandler     AssetAcceptHandlerI
+	address                string
 }
 
 func NewAssetTransferServerGrpc(
-	handler AssetTransferHandlerI,
+	requestToAcceptHandler AssetTransferHandlerI,
+	assetAcceptHandler AssetAcceptHandlerI,
 	address string,
 ) *assetTransferServerGrpc {
 	return &assetTransferServerGrpc{
-		mtx:     utility.NewMutex(),
-		handler: handler,
-		address: address,
+		mtx:                    utility.NewMutex(),
+		requestToAcceptHandler: requestToAcceptHandler,
+		assetAcceptHandler:     assetAcceptHandler,
+		address:                address,
 	}
 }
 
 func (s *assetTransferServerGrpc) RegisterHandler(
 	ctx context.Context,
-	handler AssetTransferHandlerI,
+	requestToAcceptHandler AssetTransferHandlerI,
 ) error {
 	if !s.mtx.Lock(ctx) {
 		return utility.ErrTimedOut
 	}
 
 	defer s.mtx.Unlock(ctx)
-	s.handler = handler
+	s.requestToAcceptHandler = requestToAcceptHandler
+	return nil
+}
+
+func (s *assetTransferServerGrpc) RegisterAssetAcceptHandler(
+	ctx context.Context,
+	requestToAcceptHandler AssetAcceptHandlerI,
+) error {
+	s.assetAcceptHandler = requestToAcceptHandler
 	return nil
 }
 
@@ -70,7 +81,7 @@ func (s *assetTransferServerGrpc) RequestToAcceptAsset(
 		}, nil
 	}
 
-	handler := s.handler
+	handler := s.requestToAcceptHandler
 	s.mtx.Unlock(ctx)
 
 	requestTime := time.UnixMilli(int64(request.TimeMs))
@@ -126,5 +137,25 @@ func (s *assetTransferServerGrpc) AcceptAsset(
 	ctx context.Context,
 	request *sig_graph_grpc.AcceptAssetRequest,
 ) (*sig_graph_grpc.AcceptAssetResponse, error) {
-	panic("implement me")
+	if !s.mtx.Lock(ctx) {
+		return &sig_graph_grpc.AcceptAssetResponse{}, nil
+	}
+
+	handler := s.assetAcceptHandler
+	s.mtx.Unlock(ctx)
+
+	fmt.Printf("request %+v\n", request)
+
+	handler.HandleAssetAccept(
+		ctx,
+		request.AckId,
+		request.Accepted,
+		request.Message,
+		request.NewId,
+		request.NewSecret,
+		request.OldId,
+		request.OldSecret,
+	)
+
+	return &sig_graph_grpc.AcceptAssetResponse{}, nil
 }

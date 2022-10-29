@@ -11,26 +11,34 @@ import (
 type AssetTransferServerApi interface {
 	// will block, so you should call this function inside a goroutine
 	Start() error
-	GetDefaultBusName() string
+	GetDefaultNewReceivedRequestToAcceptAssetTopic() string
+	GetDefaultNewReceivedAssetAcceptTopic() string
 }
 
 type AssetTransferHandlerI interface {
 	service_asset_transfer.AssetTransferHandlerI
 }
 
+type AssetAcceptHandlerI interface {
+	service_asset_transfer.AssetAcceptHandlerI
+}
+
 type AssetTransferServerApiOptions struct {
-	CustomHandlers    []AssetTransferHandlerI
-	BusName           string
-	SigGraphApiClient api_sig_graph.SigGraphClientApi
-	EventBus          EventBus.Bus
+	CustomHandlers                       []AssetTransferHandlerI
+	NewReceivedRequestToAcceptAssetTopic string
+	NewReceivedAssetAcceptTopic          string
+	SigGraphApiClient                    api_sig_graph.SigGraphClientApi
+	EventBus                             EventBus.Bus
 }
 
 type assetTransferServerApi struct {
-	assetTransferServer service_asset_transfer.AssetTransferServerI
-	busName             string
+	assetTransferServer                 service_asset_transfer.AssetTransferServerI
+	newReceivedRequesToAcceptAssetTopic string
+	newAssetAcceptTopic                 string
 }
 
-const defaultBusName = "new_request_to_accept_asset_event"
+const defaultNewReceivedRequestToAcceptAssetTopic = "new_request_to_accept_asset_event"
+const defaultNewReceivedAssetAcceptTopic = "new_received_asset_accept_topic"
 
 func NewAssetTransferServerApi(
 	serverAddress string,
@@ -53,13 +61,13 @@ func NewAssetTransferServerApi(
 		}
 
 		if option.EventBus != nil {
-			busName := defaultBusName
-			if option.BusName != "" {
-				busName = option.BusName
+			newReceivedRequesToAcceptAssetTopic := defaultNewReceivedRequestToAcceptAssetTopic
+			if option.NewReceivedRequestToAcceptAssetTopic != "" {
+				newReceivedRequesToAcceptAssetTopic = option.NewReceivedRequestToAcceptAssetTopic
 			}
 
 			var err error
-			handler, err = NewAssetTransferHandlerEventBus(option.EventBus, busName)
+			handler, err = NewAssetTransferHandlerEventBus(option.EventBus, newReceivedRequesToAcceptAssetTopic)
 			if err != nil {
 				return nil, err
 			}
@@ -92,8 +100,26 @@ func NewAssetTransferServerApi(
 		}
 	}
 
+	assetAcceptHandler, err := NewAssetAcceptHandlerDefault()
+	if err != nil {
+		return nil, err
+	}
+
+	if option.EventBus != nil {
+		topicName := defaultNewReceivedAssetAcceptTopic
+		if option.NewReceivedAssetAcceptTopic != "" {
+			topicName = option.NewReceivedAssetAcceptTopic
+		}
+
+		assetAcceptHandler, err = NewAssetAcceptHandlerEventBus(option.EventBus, topicName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	assetTransferServer := service_asset_transfer.NewAssetTransferServerGrpc(
 		multiAssetTransferHandler,
+		assetAcceptHandler,
 		serverAddress,
 	)
 	return &assetTransferServerApi{
@@ -101,8 +127,12 @@ func NewAssetTransferServerApi(
 	}, nil
 }
 
-func (a *assetTransferServerApi) GetDefaultBusName() string {
-	return defaultBusName
+func (a *assetTransferServerApi) GetDefaultNewReceivedRequestToAcceptAssetTopic() string {
+	return defaultNewReceivedRequestToAcceptAssetTopic
+}
+
+func (a *assetTransferServerApi) GetDefaultNewReceivedAssetAcceptTopic() string {
+	return defaultNewReceivedAssetAcceptTopic
 }
 
 func (a *assetTransferServerApi) Start() error {

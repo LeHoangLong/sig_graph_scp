@@ -17,11 +17,11 @@ message SignatureCandidate {
 }
 
 message SecretId {
-    string this_id = 1;
-    string this_secret = 2;
+    string this_id = 1; // the id of the other node, but stored on this side
+    string this_secret = 2; // the secret of the other node, but stored on this side
 
-    string other_id = 3;
-    string other_secret = 4;
+    string other_id = 3; // the id of this node, but stored on the other side
+    string other_secret = 4; // the secret of this node, but stored on the other side
 }
 
 message RequestToAcceptAssetRequest {
@@ -41,7 +41,11 @@ message RequestToAcceptAssetResponse {
 message AcceptAssetRequest {
     string ack_id  = 1;
     bool accepted = 2;
-    SignatureCandidate selected_id = 3;
+    string message = 3;
+    string new_id = 4; // new asset id
+    string new_secret = 5; // new asset secret, used to generate hash that is stored on old node side
+    string old_id = 8; // old asset id
+    string old_secret = 9; // old asset secret, used to generate hash that is stored on new node side
 }
 
 message AcceptAssetResponse {}

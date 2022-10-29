@@ -32,3 +32,11 @@ func NewAssetTransferHandlerFilterExposedSecretIdsNotFound(
 func NewAssetTransferHandlerDefault() (AssetTransferHandlerI, error) {
 	return service_asset_transfer.NewAssetTransferHandlerDefault(), nil
 }
+
+func NewAssetAcceptHandlerEventBus(bus EventBus.Bus, topicName string) (AssetAcceptHandlerI, error) {
+	return service_asset_transfer.NewAssetAcceptHandlerEventBus(bus, topicName), nil
+}
+
+func NewAssetAcceptHandlerDefault() (AssetAcceptHandlerI, error) {
+	return service_asset_transfer.NewAssetAcceptHandlerDefault(), nil
+}

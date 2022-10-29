@@ -78,6 +78,7 @@ func main() {
 
 	// utility classes
 	clock := utility.NewClockWall()
+	hashedIdGenerator := utility.NewHashedIdGeneratorService()
 
 	// transaction manager
 	transactionManager := repository_server.NewTransactionManagerGorm(db)
@@ -108,16 +109,19 @@ func main() {
 	assetTransferRepository := repository_server.NewAssetTransferRepositoryGorm(*transactionManager)
 
 	// controller
+	nodeController := controller_server.NewNodeController(nodeRepository, transactionManager)
 	assetController := controller_server.NewAssetController(assetApi, assetRepository, userKeyPairRepository, transactionManager)
 	userKeyPairController := controller_server.NewUserKeyPairController(userKeyPairRepository, transactionManager)
 	peerController := controller_server.NewPeerController(transactionManager, peerRepository)
 	assetTransferController := controller_server.NewAssetTransferController(
 		clock,
+		hashedIdGenerator,
 		assetTransferApi,
 		assetRepository,
 		transactionManager,
 		userKeyPairRepository,
 		nodeRepository,
+		nodeController,
 		peerRepository,
 		assetController,
 		assetTransferRepository,
@@ -128,7 +132,12 @@ func main() {
 		assetTransferController.SubscribeNewAcceptAssetRequestReceivedEvent(
 			ctx,
 			eventBus,
-			assetTransferServerApi.GetDefaultBusName(),
+			assetTransferServerApi.GetDefaultNewReceivedRequestToAcceptAssetTopic(),
+		)
+		assetTransferController.SubscribeNewAssetAcceptReceivedEvent(
+			ctx,
+			eventBus,
+			assetTransferServerApi.GetDefaultNewReceivedAssetAcceptTopic(),
 		)
 	}
 
@@ -159,6 +168,9 @@ func main() {
 		// asset transfer
 		api.POST("/asset_accept_requests", auth.Authenticate, assetTransferView.CreateRequestToAcceptAsset)
 		api.GET("/asset_accept_requests", auth.Authenticate, assetTransferView.GetReceivedRequestToAcceptAsset)
+
+		// accept asset transfer
+		api.POST("/asset_accept_requests/acceptance", auth.Authenticate, assetTransferView.AcceptReceivedRequestToAcceptAsset)
 	}
 
 	router.NoRoute(func(ctx *gin.Context) { ctx.JSON(http.StatusNotFound, gin.H{}) })

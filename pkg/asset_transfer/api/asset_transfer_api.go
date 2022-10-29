@@ -20,6 +20,16 @@ type AssetTransferServiceApi interface {
 		exposedPrivateConnections map[string]model_asset_transfer.PrivateId,
 		isNewConnectionSecretOrPublic bool,
 	) (*model_asset_transfer.RequestToAcceptAsset, error)
+
+	AcceptRequestToAcceptAsset(
+		ctx context.Context,
+		peer *model_asset_transfer.Peer,
+		request *model_asset_transfer.RequestToAcceptAsset,
+		acceptOrReject bool,
+		message string,
+		isNewConnectionSecretOrPublic bool,
+		toInformSenderOfNewId bool,
+	) error
 }
 
 type Options struct {
@@ -71,5 +81,25 @@ func (s *assetTransferServiceApi) TransferAsset(
 		peer,
 		exposedPrivateConnections,
 		isNewConnectionSecretOrPublic,
+	)
+}
+
+func (s *assetTransferServiceApi) AcceptRequestToAcceptAsset(
+	ctx context.Context,
+	peer *model_asset_transfer.Peer,
+	request *model_asset_transfer.RequestToAcceptAsset,
+	acceptOrReject bool,
+	message string,
+	isNewConnectionSecretOrPublic bool,
+	toInformSenderOfNewId bool,
+) error {
+	return s.assetTransferService.AcceptRequestToAcceptAsset(
+		ctx,
+		peer,
+		request,
+		acceptOrReject,
+		message,
+		isNewConnectionSecretOrPublic,
+		toInformSenderOfNewId,
 	)
 }

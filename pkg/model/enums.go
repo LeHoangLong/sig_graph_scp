@@ -22,5 +22,7 @@ const (
 type ERequestToAcceptAssetStatus = string
 
 const (
-	ERequestToAcceptAssetStatusPending ERequestToAcceptAssetStatus = "pending"
+	ERequestToAcceptAssetStatusPending  ERequestToAcceptAssetStatus = "pending"
+	ERequestToAcceptAssetStatusAccepted ERequestToAcceptAssetStatus = "accepted"
+	ERequestToAcceptAssetStatusRejected ERequestToAcceptAssetStatus = "rejected"
 )

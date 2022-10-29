@@ -31,7 +31,7 @@ func (s *assetTransferHandlerEventBus) HandleAssetTransfer(
 	exposedSecretIds map[string]model_asset_transfer.PrivateId,
 	candidates []model_asset_transfer.CandidateId,
 ) error {
-	fmt.Println("publishing event ", s.topicName)
+	fmt.Println("handle request to asset accept ", s.topicName)
 	request := model_asset_transfer.RequestToAcceptAssetEvent{
 		TimeMs:                    uint64(requestTime.Unix()),
 		AssetId:                   assetId,

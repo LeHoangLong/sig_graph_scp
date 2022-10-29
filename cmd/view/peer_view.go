@@ -1,7 +1,6 @@
 package view
 
 import (
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -70,8 +69,6 @@ func (v *peerView) CreatePeer(c *gin.Context) {
 		utility.AbortBadRequest(c, err)
 		return
 	}
-
-	fmt.Printf("request: %+v\n", request)
 
 	publicKey := ""
 	{

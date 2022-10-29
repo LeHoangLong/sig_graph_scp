@@ -2,7 +2,9 @@ package service_sig_graph
 
 import (
 	"context"
+	"crypto/sha512"
 	"encoding/json"
+	"fmt"
 	"sig_graph_scp/pkg/model"
 	model_sig_graph "sig_graph_scp/pkg/sig_graph/model"
 	"sig_graph_scp/pkg/utility"
@@ -135,4 +137,81 @@ func (s *assetService) GetAssetById(ctx context.Context, id string) (*model_sig_
 	}
 
 	return &asset, nil
+}
+
+type transefrAssetRequest struct {
+	TimeMs uint64 `json:"time_ms"`
+
+	CurrentId        string `json:"current_id"`
+	CurrentSignature string `json:"current_signature"`
+	CurrentSecret    string `json:"current_secret"`
+
+	NewId        string `json:"new_id"`
+	NewSignature string `json:"new_signature"`
+	NewSecret    string `json:"new_secret"`
+
+	NewOwnerPublicKey string `json:"new_owner_public_key"`
+}
+
+func (s *assetService) TransferAsset(
+	ctx context.Context,
+	time_ms uint64,
+	asset *model_sig_graph.Asset,
+	newOwnerKey *model_sig_graph.UserKeyPair,
+	newId string,
+	newSecret string,
+	currentSecret string,
+	currentSignature string,
+) (*model_sig_graph.Asset, error) {
+	newAsset := *asset
+	newAsset.Id = newId
+	newAsset.OwnerPublicKey = newOwnerKey.Public
+	if newSecret != "" {
+		currentSecretId := fmt.Sprintf("%s%s", asset.Id, currentSecret)
+		currentHashBytes := sha512.Sum512([]byte(currentSecretId))
+		currentHash := string(currentHashBytes[:])
+		newAsset.PrivateParentsHashedIds[currentHash] = true
+	} else {
+		newAsset.PublicParentsIds[asset.Id] = true
+	}
+
+	signature, err := s.signingService.Sign(
+		ctx,
+		newOwnerKey,
+		newAsset,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	request := transefrAssetRequest{
+		TimeMs:           time_ms,
+		CurrentId:        asset.Id,
+		CurrentSignature: currentSignature,
+		CurrentSecret:    currentSecret,
+
+		NewId:        newId,
+		NewSignature: signature,
+		NewSecret:    newSecret,
+
+		NewOwnerPublicKey: newOwnerKey.Public,
+	}
+
+	requestJson, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	assetStr, err := s.smartContractService.CreateTransaction("TransferAsset", string(requestJson))
+	if err != nil {
+		return nil, err
+	}
+
+	assetSigGraph := model_sig_graph.Asset{}
+	err = json.Unmarshal([]byte(assetStr), &assetSigGraph)
+	if err != nil {
+		return nil, err
+	}
+	return &assetSigGraph, nil
 }

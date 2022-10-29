@@ -1,7 +1,6 @@
 package view
 
 import (
-	"fmt"
 	"net/http"
 	"sig_graph_scp/cmd/middleware"
 	utility "sig_graph_scp/cmd/utility"
@@ -76,8 +75,6 @@ func (v *assetView) GetAssetById(c *gin.Context) {
 		utility.AbortBadRequest(c, err)
 		return
 	}
-
-	fmt.Printf("request: %v\n", request)
 
 	asset, err := v.controller.GetAssetById(c.Request.Context(), user, model_server.NodeId(request.AssetId), request.UseCache)
 	if err != nil {
