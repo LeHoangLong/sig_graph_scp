@@ -159,6 +159,7 @@ func (c *assetTransferController) TransferAsset(
 	modelResponse := model_server.FromAssetTransferRequestToAcceptAsset(
 		0,
 		assetId,
+		nil,
 		peer.PeerDbId,
 		user.ID,
 		"",
@@ -327,6 +328,10 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 		return nil, err
 	}
 
+	if request.IsOutboundOrInbound {
+		return nil, fmt.Errorf("%w: cannot accept outbound request", utility.ErrInvalidArgument)
+	}
+
 	namespace := fmt.Sprintf("%d", user.ID)
 	asset, err := c.assetRepository.FetchAssetsByDbIds(
 		ctx,
@@ -336,12 +341,14 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 			request.AssetId: true,
 		},
 	)
+
 	if err != nil {
 		return nil, err
 	}
 	if len(asset) == 0 {
 		return nil, utility.ErrNotFound
 	}
+
 	sigGraphAsset := model_server.ToSigGraphAsset(&asset[0])
 
 	peer, err := c.peerRepository.FetchPeerById(
@@ -372,12 +379,13 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 
 	assetTransferRequest := model_server.ToAssetTransferRequestToAcceptAsset(
 		&sigGraphAsset,
+		nil,
 		peer.PeerPemPublicKey,
 		model_server.ToSigGraphUserKeyPair(&userKey),
 		request,
 	)
 
-	err = c.transferApi.AcceptRequestToAcceptAsset(
+	tempAssetTransferRequest, newSecret, oldSecret, err := c.transferApi.AcceptRequestToAcceptAsset(
 		ctx,
 		&assetTransferPeer,
 		&assetTransferRequest,
@@ -386,7 +394,21 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 		isNewConnectionSecretOrPublic,
 		toInformSenderOfNewId,
 	)
+	assetTransferRequest = *tempAssetTransferRequest
 
+	if err != nil {
+		return nil, err
+	}
+
+	// save new asset to repository
+	updatedCurrentAsset, newAsset, err := c.updateCurrentAssetAndAddNewAsset(
+		ctx,
+		user,
+		request.AssetId,
+		assetTransferRequest.NewAsset.Id,
+		newSecret,
+		oldSecret,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -398,6 +420,10 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 		request.Status = model.ERequestToAcceptAssetStatusRejected
 	}
 	request.AcceptMessage = message
+	request.AssetId = updatedCurrentAsset.NodeDbId
+	request.NewAssetId = new(model_server.NodeDbId)
+	*request.NewAssetId = newAsset.NodeDbId
+
 	err = c.assetTransferRepository.UpdateAssetAcceptRequest(ctx, txId, request)
 	if err != nil {
 		return nil, err
@@ -438,21 +464,6 @@ func (c *assetTransferController) newAcceptAssetReceivedHandler(
 		return
 	}
 
-	// update request status
-	{
-		if event.IsAccepted {
-			request.Status = model.ERequestToAcceptAssetStatusAccepted
-		} else {
-			request.Status = model.ERequestToAcceptAssetStatusRejected
-		}
-		request.AcceptMessage = event.Message
-		c.assetTransferRepository.UpdateAssetAcceptRequest(
-			ctx,
-			txId,
-			request,
-		)
-	}
-
 	user := model_server.User{
 		ID: request.UserId,
 	}
@@ -467,66 +478,183 @@ func (c *assetTransferController) newAcceptAssetReceivedHandler(
 		)
 	}
 
-	// update cached current asset
+	updatedAsset, newAsset, err := c.updateCurrentAssetAndAddNewAsset(
+		ctx,
+		&user,
+		request.AssetId,
+		event.NewId,
+		event.NewSecret,
+		event.OldSecret,
+	)
+	if err != nil {
+		return
+	}
+
+	// update request status and asset
 	{
-		namespace := fmt.Sprintf("%d", user.ID)
-		currentAssets, err := c.assetRepository.FetchAssetsByDbIds(
+		if event.IsAccepted {
+			request.Status = model.ERequestToAcceptAssetStatusAccepted
+		} else {
+			request.Status = model.ERequestToAcceptAssetStatusRejected
+		}
+		request.AcceptMessage = event.Message
+		request.AssetId = updatedAsset.NodeDbId
+		request.NewAssetId = &newAsset.NodeDbId
+		c.assetTransferRepository.UpdateAssetAcceptRequest(
 			ctx,
 			txId,
-			namespace,
-			map[model_server.NodeDbId]bool{
-				request.AssetId: true,
-			},
+			request,
 		)
+	}
+}
+
+// TODO: if this fail, we lose the new asset id information. So we need to
+// save to some backup first
+func (c *assetTransferController) updateCurrentAssetAndAddNewAsset(
+	ctx context.Context,
+	user *model_server.User,
+	currentAssetId model_server.NodeDbId,
+	newId string,
+	newSecret string,
+	oldSecret string,
+) (updatedCurrentAsset *model_server.Asset, newAsset *model_server.Asset, err error) {
+	defer func() {
 		if err != nil {
-			return
+			//TODO: save to backup
 		}
+	}()
 
-		currentAsset := &currentAssets[0]
-		// refetch from sig graph
-		currentAsset, err = c.assetController.GetAssetById(
-			ctx,
-			&user,
-			currentAsset.Id,
-			false,
-		)
-		if err != nil {
-			return
-		}
+	txId, err := c.transactionManager.BypassTransaction(ctx)
+	if err != nil {
+		return
+	}
+	defer c.transactionManager.StopBypassedTransaction(ctx, txId)
 
-		if event.NewId == "" || event.NewSecret == "" {
-			return
-		}
+	namespace := fmt.Sprintf("%d", user.ID)
+	currentAssets, err := c.assetRepository.FetchAssetsByDbIds(
+		ctx,
+		txId,
+		namespace,
+		map[model_server.NodeDbId]bool{
+			currentAssetId: true,
+		},
+	)
+	if err != nil {
+		return
+	}
 
-		if currentAsset.Id != model_server.NodeId(event.OldId) {
-			// hmm, something wrong
-		}
+	currentAsset := &currentAssets[0]
+	// refetch from sig graph
+	currentAsset, err = c.assetController.GetAssetById(
+		ctx,
+		user,
+		currentAsset.Id,
+		false,
+	)
+	if err != nil {
+		return
+	}
 
-		// update current asset's private edge toward the new asset
-		newHash, err := c.hashedIdGenerator.GenerateHashedId(event.NewId, event.NewSecret)
-		if err != nil {
-			return
-		}
+	// TODO: refactor this so that the return value is
+	// actually a copy of the current asset
+	updatedCurrentAsset = currentAsset
 
-		oldHash, err := c.hashedIdGenerator.GenerateHashedId(event.OldId, event.OldSecret)
-		if err != nil {
-			return
-		}
+	// if we don't know where the new node is, nothing we can do
+	if newId == "" {
+		return
+	}
 
-		fmt.Println("Updating node secret id")
-		c.nodeController.UpdateNodeSecretId(
+	// add new asset
+	newAsset, err = c.assetController.GetAssetById(
+		ctx,
+		user,
+		model_server.NodeId(newId),
+		false,
+	)
+
+	// update current and new asset's private edge toward the new asset
+	newHash, oldHash, err := c.generateHashId(
+		ctx,
+		newId,
+		newSecret,
+		string(currentAsset.Id),
+		oldSecret,
+	)
+	if err != nil {
+		return
+	}
+
+	if newSecret != "" {
+		var newNode *model_server.Node
+		newNode, err = c.nodeController.UpdateNodeSecretId(
 			ctx,
 			&currentAsset.Node,
 			map[string]model_server.PrivateId{
 				newHash: {
-					ThisId:      model_server.NodeId(event.NewId),
-					ThisSecret:  event.NewSecret,
+					ThisId:      model_server.NodeId(newId),
+					ThisSecret:  newSecret,
 					ThisHash:    newHash,
 					OtherId:     currentAsset.Id,
-					OtherSecret: event.OldSecret,
+					OtherSecret: oldSecret,
 					OtherHash:   oldHash,
 				},
 			},
 		)
+		if err != nil {
+			return
+		}
+		updatedCurrentAsset.Node = *newNode
 	}
+
+	if oldSecret != "" {
+		var newNode *model_server.Node
+		newNode, err = c.nodeController.UpdateNodeSecretId(
+			ctx,
+			&newAsset.Node,
+			map[string]model_server.PrivateId{
+				oldHash: {
+					ThisId:      currentAsset.Id,
+					ThisSecret:  oldSecret,
+					ThisHash:    oldHash,
+					OtherId:     model_server.NodeId(newId),
+					OtherSecret: newSecret,
+					OtherHash:   newHash,
+				},
+			},
+		)
+		if err != nil {
+			return
+		}
+		newAsset.Node = *newNode
+	}
+
+	return
+}
+
+func (c *assetTransferController) generateHashId(
+	ctx context.Context,
+	newId string,
+	newSecret string,
+	oldId string,
+	oldSecret string,
+) (newHash string, oldHash string, err error) {
+	if oldSecret != "" {
+		oldHash, err = c.hashedIdGenerator.GenerateHashedId(ctx, string(oldId), oldSecret)
+		if err != nil {
+			return
+		}
+	} else {
+		oldHash = ""
+	}
+
+	if newSecret != "" {
+		newHash, err = c.hashedIdGenerator.GenerateHashedId(ctx, string(newId), newSecret)
+		if err != nil {
+			return
+		}
+	} else {
+		newHash = ""
+	}
+
+	return
 }

@@ -2,8 +2,6 @@ package service_asset_transfer
 
 import (
 	"context"
-	"crypto/sha512"
-	"fmt"
 	utility_asset_transfer "sig_graph_scp/internal/asset_transfer/utility"
 	sig_graph_grpc "sig_graph_scp/internal/grpc"
 	service_sig_graph "sig_graph_scp/internal/sig_graph/service"
@@ -16,12 +14,14 @@ import (
 )
 
 type assetTransferServiceGrpc struct {
-	connPool           utility.GrpcConnectionPoolI
-	numberOfCandidate  uint32
-	secretIdGeneratorI SecretIdGeneratorI
-	idGeneratorService service_sig_graph.IdGenerateServiceI
-	nodeSigningService service_sig_graph.NodeSigningServiceI
-	sigGraphClientApi  api_sig_graph.SigGraphClientApi
+	connPool             utility.GrpcConnectionPoolI
+	numberOfCandidate    uint32
+	secretIdGeneratorI   SecretIdGeneratorI
+	idGeneratorService   service_sig_graph.IdGenerateServiceI
+	nodeSigningService   service_sig_graph.NodeSigningServiceI
+	sigGraphClientApi    api_sig_graph.SigGraphClientApi
+	hashGeneratorService utility.HashedIdGeneratorServiceI
+	cloner               utility.ClonerI
 }
 
 func NewAssetTransferServiceGrpc(
@@ -30,13 +30,19 @@ func NewAssetTransferServiceGrpc(
 	secretIdGeneratorI SecretIdGeneratorI,
 	idGeneratorService service_sig_graph.IdGenerateServiceI,
 	nodeSigningService service_sig_graph.NodeSigningServiceI,
+	sigGraphClientApi api_sig_graph.SigGraphClientApi,
+	hashGeneratorService utility.HashedIdGeneratorServiceI,
+	cloner utility.ClonerI,
 ) *assetTransferServiceGrpc {
 	return &assetTransferServiceGrpc{
-		connPool:           connPool,
-		numberOfCandidate:  numberOfCandidate,
-		secretIdGeneratorI: secretIdGeneratorI,
-		idGeneratorService: idGeneratorService,
-		nodeSigningService: nodeSigningService,
+		connPool:             connPool,
+		numberOfCandidate:    numberOfCandidate,
+		secretIdGeneratorI:   secretIdGeneratorI,
+		idGeneratorService:   idGeneratorService,
+		nodeSigningService:   nodeSigningService,
+		sigGraphClientApi:    sigGraphClientApi,
+		hashGeneratorService: hashGeneratorService,
+		cloner:               cloner,
 	}
 }
 
@@ -83,6 +89,12 @@ func (s *assetTransferServiceGrpc) TransferAsset(
 
 	if isNewConnectionSecretOrPublic {
 		for i := uint32(0); i < s.numberOfCandidate; i++ {
+			draftAsset := &model_sig_graph.Asset{}
+			err = s.cloner.Clone(ctx, asset, draftAsset)
+			if err != nil {
+				return nil, err
+			}
+			draftAsset.UpdatedTime = uint64(requestTime.UnixMilli())
 			id, err := s.idGeneratorService.NewFullId(ctx)
 			if err != nil {
 				return nil, err
@@ -94,10 +106,13 @@ func (s *assetTransferServiceGrpc) TransferAsset(
 			}
 
 			// generate signature for this candidate
-			hashByte := sha512.Sum512([]byte(fmt.Sprintf("%s%s", id, secret)))
-			hash := string(hashByte[:])
-			asset.PrivateChildrenHashedIds[hash] = true
-			signature, err := s.nodeSigningService.Sign(ctx, ownerKey, &asset)
+			hash, err := s.hashGeneratorService.GenerateHashedId(ctx, id, secret)
+			if err != nil {
+				return nil, err
+			}
+
+			draftAsset.PrivateChildrenHashedIds[hash] = true
+			signature, err := s.nodeSigningService.Sign(ctx, ownerKey, &draftAsset)
 			if err != nil {
 				return nil, err
 			}
@@ -111,14 +126,20 @@ func (s *assetTransferServiceGrpc) TransferAsset(
 		}
 	} else {
 		for i := uint32(0); i < s.numberOfCandidate; i++ {
+			draftAsset := &model_sig_graph.Asset{}
+			err = s.cloner.Clone(ctx, asset, draftAsset)
+			if err != nil {
+				return nil, err
+			}
+			draftAsset.UpdatedTime = uint64(requestTime.UnixMilli())
 			id, err := s.idGeneratorService.NewFullId(ctx)
 			if err != nil {
 				return nil, err
 			}
 
 			// generate signature for this candidate
-			asset.PublicChildrenIds[string(id)] = true
-			signature, err := s.nodeSigningService.Sign(ctx, ownerKey, &asset)
+			draftAsset.PublicChildrenIds[string(id)] = true
+			signature, err := s.nodeSigningService.Sign(ctx, ownerKey, &draftAsset)
 			if err != nil {
 				return nil, err
 			}
@@ -185,15 +206,18 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 	message string,
 	isNewConnectionSecretOrPublic bool,
 	toInformSenderOfNewId bool,
-) error {
+) (updatedRequest *model_asset_transfer.RequestToAcceptAsset, newSecret string, oldSecret string, err error) {
 	conn, err := s.connPool.NewConnection(ctx, peer.ConnectionUri)
 	if err != nil {
-		return err
+		return
 	}
 	defer s.connPool.ReturnConnection(ctx, peer.ConnectionUri, conn)
 
+	updatedRequest = &model_asset_transfer.RequestToAcceptAsset{}
+	*updatedRequest = *request
+
 	grpcRequest := sig_graph_grpc.AcceptAssetRequest{
-		AckId:     request.AckId,
+		AckId:     updatedRequest.AckId,
 		Accepted:  acceptOrReject,
 		Message:   message,
 		NewId:     "",
@@ -202,18 +226,53 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 		OldSecret: "",
 	}
 
+	currentSecret, err := s.secretIdGeneratorI.NewSecretId(ctx)
+	if err != nil {
+		return
+	}
+
+	var selectedCandidate *model_asset_transfer.CandidateId
+	for i := range updatedRequest.Candidates {
+		var newAsset, updatedAsset *model_sig_graph.Asset
+		updatedAsset, newAsset, err = s.sigGraphClientApi.TransferAsset(
+			ctx,
+			updatedRequest.TimeMs,
+			&updatedRequest.Asset,
+			&updatedRequest.UserKeyPair,
+			updatedRequest.Candidates[i].Id,
+			updatedRequest.Candidates[i].Secret,
+			currentSecret,
+			updatedRequest.Candidates[i].Signature,
+		)
+
+		if err != nil {
+			// if already exists, use another candidate
+			if err == utility.ErrAlreadyExists {
+				continue
+			}
+			return
+		}
+
+		selectedCandidate = &updatedRequest.Candidates[i]
+		updatedRequest.NewAsset = newAsset
+		updatedRequest.Asset = *updatedAsset
+		break
+	}
+
 	if toInformSenderOfNewId {
-		grpcRequest.NewId = "test-id"
-		grpcRequest.NewSecret = "test-secert"
-		grpcRequest.OldId = "old-id"
-		grpcRequest.OldSecret = "old-secret"
+		grpcRequest.NewId = selectedCandidate.Id
+		grpcRequest.NewSecret = selectedCandidate.Secret
+		grpcRequest.OldId = updatedRequest.Asset.Id
+		grpcRequest.OldSecret = currentSecret
 	}
 
 	client := sig_graph_grpc.NewTransferAssetClient(conn)
 	_, err = client.AcceptAsset(ctx, &grpcRequest)
 	if err != nil {
-		return err
+		return
 	}
 
-	return nil
+	newSecret = selectedCandidate.Secret
+	oldSecret = currentSecret
+	return
 }

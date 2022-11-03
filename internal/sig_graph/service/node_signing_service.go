@@ -47,7 +47,6 @@ func (s *nodeSigningService) Sign(ctx context.Context, userKeyPair *model_sig_gr
 	}
 
 	base64Signature := base64.StdEncoding.EncodeToString([]byte(signature))
-
 	return base64Signature, nil
 }
 

@@ -10,6 +10,7 @@ import (
 	api_asset_transfer "sig_graph_scp/pkg/asset_transfer/api"
 	controller_server "sig_graph_scp/pkg/server/controller"
 	repository_server "sig_graph_scp/pkg/server/repository"
+	service_server "sig_graph_scp/pkg/server/service"
 	api_sig_graph "sig_graph_scp/pkg/sig_graph/api"
 	"sig_graph_scp/pkg/utility"
 
@@ -31,7 +32,7 @@ func main() {
 
 	// asset transfer api
 	assetTransferApi, err := api_asset_transfer.NewAssetTransferServiceApi(
-		"sgp://hyper:[http://localhost:7051,http://localhost:9051]:public",
+		assetApi,
 		&api_asset_transfer.Options{
 			NumberOfCandidates: 6,
 		},
@@ -108,9 +109,12 @@ func main() {
 	peerRepository := repository_server.NewPeerRepositoryGorm(transactionManager)
 	assetTransferRepository := repository_server.NewAssetTransferRepositoryGorm(*transactionManager)
 
+	// service
+	nodeService := service_server.NewNodeService(nodeRepository)
+
 	// controller
-	nodeController := controller_server.NewNodeController(nodeRepository, transactionManager)
-	assetController := controller_server.NewAssetController(assetApi, assetRepository, userKeyPairRepository, transactionManager)
+	nodeController := controller_server.NewNodeController(nodeService, transactionManager)
+	assetController := controller_server.NewAssetController(assetApi, assetRepository, userKeyPairRepository, transactionManager, hashedIdGenerator)
 	userKeyPairController := controller_server.NewUserKeyPairController(userKeyPairRepository, transactionManager)
 	peerController := controller_server.NewPeerController(transactionManager, peerRepository)
 	assetTransferController := controller_server.NewAssetTransferController(

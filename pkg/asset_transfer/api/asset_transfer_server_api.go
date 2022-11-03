@@ -4,6 +4,7 @@ import (
 	"context"
 	service_asset_transfer "sig_graph_scp/internal/asset_transfer/service"
 	api_sig_graph "sig_graph_scp/pkg/sig_graph/api"
+	"sig_graph_scp/pkg/utility"
 
 	EventBus "github.com/asaskevich/eventbus"
 )
@@ -117,10 +118,13 @@ func NewAssetTransferServerApi(
 		}
 	}
 
+	hashedIdGenerator := utility.NewHashedIdGeneratorService()
+
 	assetTransferServer := service_asset_transfer.NewAssetTransferServerGrpc(
 		multiAssetTransferHandler,
 		assetAcceptHandler,
 		serverAddress,
+		hashedIdGenerator,
 	)
 	return &assetTransferServerApi{
 		assetTransferServer: assetTransferServer,

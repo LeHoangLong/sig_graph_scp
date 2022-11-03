@@ -10,5 +10,5 @@ type NodeControllerI interface {
 		ctx context.Context,
 		node *model_server.Node,
 		secretIds map[string]model_server.PrivateId,
-	) error
+	) (*model_server.Node, error)
 }

@@ -1,7 +1,9 @@
 package utility
 
 import (
+	"context"
 	"crypto/sha512"
+	"encoding/base64"
 	"fmt"
 )
 
@@ -12,9 +14,9 @@ func NewHashedIdGeneratorService() *hashedIdGeneratorService {
 	return &hashedIdGeneratorService{}
 }
 
-func (s *hashedIdGeneratorService) GenerateHashedId(id string, secret string) (string, error) {
+func (s *hashedIdGeneratorService) GenerateHashedId(ctx context.Context, id string, secret string) (string, error) {
 	secretId := fmt.Sprintf("%s%s", id, secret)
 	hashByte := sha512.Sum512([]byte(secretId))
-	hash := string(hashByte[:])
+	hash := base64.StdEncoding.EncodeToString(hashByte[:])
 	return hash, nil
 }

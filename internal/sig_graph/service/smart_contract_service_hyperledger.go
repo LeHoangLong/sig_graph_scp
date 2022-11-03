@@ -2,7 +2,6 @@ package service_sig_graph
 
 import (
 	"crypto/x509"
-	"fmt"
 	utility_sig_graph "sig_graph_scp/internal/sig_graph/utility"
 	"sig_graph_scp/pkg/utility"
 	"strings"
@@ -95,7 +94,6 @@ func wrapError(err error) error {
 	for _, detail := range statusErr.Details() {
 		switch detail := detail.(type) {
 		case *gateway.ErrorDetail:
-			fmt.Println("err 1 ", detail)
 			if strings.Contains(detail.Message, "not found") {
 				err = multierr.Append(err, utility.ErrNotFound)
 			}

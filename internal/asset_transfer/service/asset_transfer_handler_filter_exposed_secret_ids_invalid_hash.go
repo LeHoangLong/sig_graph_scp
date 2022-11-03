@@ -2,21 +2,23 @@ package service_asset_transfer
 
 import (
 	"context"
-	"crypto/sha512"
-	"fmt"
 	model_asset_transfer "sig_graph_scp/pkg/asset_transfer/model"
+	"sig_graph_scp/pkg/utility"
 	"time"
 )
 
 type assetTransferHandlerFilterExposedSecretIdsInvalidHash struct {
-	handler AssetTransferHandlerI
+	handler       AssetTransferHandlerI
+	hashGenerator utility.HashedIdGeneratorServiceI
 }
 
 func NewAssetTransferHandlerFilterExposedSecretIdsInvalidHash(
 	handler AssetTransferHandlerI,
+	hashGenerator utility.HashedIdGeneratorServiceI,
 ) *assetTransferHandlerFilterExposedSecretIdsInvalidHash {
 	return &assetTransferHandlerFilterExposedSecretIdsInvalidHash{
-		handler: handler,
+		handler:       handler,
+		hashGenerator: hashGenerator,
 	}
 }
 
@@ -34,9 +36,10 @@ func (s *assetTransferHandlerFilterExposedSecretIdsInvalidHash) HandleAssetTrans
 	for hash := range exposedSecretIds {
 		thisId := exposedSecretIds[hash].ThisId
 		thisSecret := exposedSecretIds[hash].ThisSecret
-		thisSecretId := fmt.Sprintf("%s%s", thisId, thisSecret)
-		thisHashByte := sha512.Sum512([]byte(thisSecretId))
-		thisHash := string(thisHashByte[:])
+		thisHash, err := s.hashGenerator.GenerateHashedId(ctx, thisId, thisSecret)
+		if err != nil {
+			return err
+		}
 
 		if hash != thisHash && hash != exposedSecretIds[hash].ThisHash {
 			continue
@@ -44,9 +47,10 @@ func (s *assetTransferHandlerFilterExposedSecretIdsInvalidHash) HandleAssetTrans
 
 		otherId := exposedSecretIds[hash].OtherId
 		otherSecret := exposedSecretIds[hash].OtherSecret
-		otherSecretId := fmt.Sprintf("%s%s", otherId, otherSecret)
-		otherHashByte := sha512.Sum512([]byte(otherSecretId))
-		otherHash := string(otherHashByte[:])
+		otherHash, err := s.hashGenerator.GenerateHashedId(ctx, otherId, otherSecret)
+		if err != nil {
+			return err
+		}
 
 		if otherHash != exposedSecretIds[hash].OtherHash {
 			continue

@@ -2,8 +2,6 @@ package service_asset_transfer
 
 import (
 	"context"
-	"crypto/sha512"
-	"fmt"
 	"net"
 	utility_asset_transfer "sig_graph_scp/internal/asset_transfer/utility"
 	sig_graph_grpc "sig_graph_scp/internal/grpc"
@@ -21,18 +19,21 @@ type assetTransferServerGrpc struct {
 	requestToAcceptHandler AssetTransferHandlerI
 	assetAcceptHandler     AssetAcceptHandlerI
 	address                string
+	hashGenerator          utility.HashedIdGeneratorServiceI
 }
 
 func NewAssetTransferServerGrpc(
 	requestToAcceptHandler AssetTransferHandlerI,
 	assetAcceptHandler AssetAcceptHandlerI,
 	address string,
+	hashGenerator utility.HashedIdGeneratorServiceI,
 ) *assetTransferServerGrpc {
 	return &assetTransferServerGrpc{
 		mtx:                    utility.NewMutex(),
 		requestToAcceptHandler: requestToAcceptHandler,
 		assetAcceptHandler:     assetAcceptHandler,
 		address:                address,
+		hashGenerator:          hashGenerator,
 	}
 }
 
@@ -92,13 +93,19 @@ func (s *assetTransferServerGrpc) RequestToAcceptAsset(
 	grpcExposedSecretIds := request.SecretIds
 	exposedSecretIds := map[string]model_asset_transfer.PrivateId{}
 	for hash, id := range grpcExposedSecretIds {
-		thisSecretId := fmt.Sprintf("%s%s", id.ThisId, id.ThisSecret)
-		thisHashBytes := sha512.Sum512([]byte(thisSecretId))
-		thisHash := string(thisHashBytes[:])
+		thisHash, err := s.hashGenerator.GenerateHashedId(ctx, id.ThisId, id.ThisSecret)
+		if err != nil {
+			return &sig_graph_grpc.RequestToAcceptAssetResponse{
+				Error: utility_asset_transfer.ToGrpcError(err),
+			}, nil
+		}
 
-		otherSecretId := fmt.Sprintf("%s%s", id.OtherId, id.OtherSecret)
-		otherHashBytes := sha512.Sum512([]byte(otherSecretId))
-		otherHash := string(otherHashBytes[:])
+		otherHash, err := s.hashGenerator.GenerateHashedId(ctx, id.OtherId, id.OtherSecret)
+		if err != nil {
+			return &sig_graph_grpc.RequestToAcceptAssetResponse{
+				Error: utility_asset_transfer.ToGrpcError(err),
+			}, nil
+		}
 
 		exposedSecretIds[hash] = model_asset_transfer.PrivateId{
 			ThisId:     id.ThisId,
@@ -143,8 +150,6 @@ func (s *assetTransferServerGrpc) AcceptAsset(
 
 	handler := s.assetAcceptHandler
 	s.mtx.Unlock(ctx)
-
-	fmt.Printf("request %+v\n", request)
 
 	handler.HandleAssetAccept(
 		ctx,

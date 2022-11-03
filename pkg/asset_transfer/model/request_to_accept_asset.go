@@ -12,6 +12,7 @@ type RequestToAcceptAsset struct {
 	AckId                     string                            `json:"ack_id"`
 	Accepted                  bool                              `json:"accepted"`
 	Asset                     model_sig_graph.Asset             `json:"asset"`
+	NewAsset                  *model_sig_graph.Asset            `json:"new_asset"`
 	PeerPemPublicKey          string                            `json:"peer_pem_public_key"`
 	UserKeyPair               model_sig_graph.UserKeyPair       `json:"user_id"`
 	ExposedPrivateConnections map[string]PrivateId              `json:"exposed_private_connections"`

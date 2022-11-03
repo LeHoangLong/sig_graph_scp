@@ -2,9 +2,7 @@ package service_sig_graph
 
 import (
 	"context"
-	"crypto/sha512"
 	"encoding/json"
-	"fmt"
 	"sig_graph_scp/pkg/model"
 	model_sig_graph "sig_graph_scp/pkg/sig_graph/model"
 	"sig_graph_scp/pkg/utility"
@@ -17,6 +15,8 @@ type assetService struct {
 	clock                utility.ClockI
 	idGenerateService    IdGenerateServiceI
 	signingService       NodeSigningServiceI
+	hashGeneratorService utility.HashedIdGeneratorServiceI
+	cloner               utility.ClonerI
 }
 
 func NewAssetService(
@@ -24,12 +24,16 @@ func NewAssetService(
 	clock utility.ClockI,
 	idGenerateService IdGenerateServiceI,
 	signingService NodeSigningServiceI,
+	hashGeneratorService utility.HashedIdGeneratorServiceI,
+	cloner utility.ClonerI,
 ) AssetServiceI {
 	return &assetService{
 		smartContractService: smartContractService,
 		clock:                clock,
 		idGenerateService:    idGenerateService,
 		signingService:       signingService,
+		hashGeneratorService: hashGeneratorService,
+		cloner:               cloner,
 	}
 }
 
@@ -162,17 +166,45 @@ func (s *assetService) TransferAsset(
 	newSecret string,
 	currentSecret string,
 	currentSignature string,
-) (*model_sig_graph.Asset, error) {
-	newAsset := *asset
-	newAsset.Id = newId
-	newAsset.OwnerPublicKey = newOwnerKey.Public
+) (updatedCurrentAsset *model_sig_graph.Asset, newAsset *model_sig_graph.Asset, err error) {
+	currentHash := ""
+	newHash := ""
+
+	updatedCurrentAsset = &model_sig_graph.Asset{}
+	err = s.cloner.Clone(ctx, asset, updatedCurrentAsset)
+	if err != nil {
+		return
+	}
+
 	if newSecret != "" {
-		currentSecretId := fmt.Sprintf("%s%s", asset.Id, currentSecret)
-		currentHashBytes := sha512.Sum512([]byte(currentSecretId))
-		currentHash := string(currentHashBytes[:])
+		newHash, err = s.hashGeneratorService.GenerateHashedId(ctx, newId, newSecret)
+		if err != nil {
+			return
+		}
+		updatedCurrentAsset.PrivateChildrenHashedIds[newHash] = true
+	} else {
+		updatedCurrentAsset.PublicChildrenIds[newId] = true
+	}
+
+	newAsset = &model_sig_graph.Asset{}
+	err = s.cloner.Clone(ctx, asset, newAsset)
+	if err != nil {
+		return
+	}
+	newAsset.Id = newId
+	newAsset.CreatedTime = time_ms
+	newAsset.UpdatedTime = time_ms
+	newAsset.CreationProcess = model.ECreationProcessTransfer
+
+	newAsset.OwnerPublicKey = newOwnerKey.Public
+	if currentSecret != "" {
+		currentHash, err = s.hashGeneratorService.GenerateHashedId(ctx, updatedCurrentAsset.Id, currentSecret)
+		if err != nil {
+			return
+		}
 		newAsset.PrivateParentsHashedIds[currentHash] = true
 	} else {
-		newAsset.PublicParentsIds[asset.Id] = true
+		newAsset.PublicParentsIds[updatedCurrentAsset.Id] = true
 	}
 
 	signature, err := s.signingService.Sign(
@@ -182,12 +214,12 @@ func (s *assetService) TransferAsset(
 	)
 
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	request := transefrAssetRequest{
 		TimeMs:           time_ms,
-		CurrentId:        asset.Id,
+		CurrentId:        updatedCurrentAsset.Id,
 		CurrentSignature: currentSignature,
 		CurrentSecret:    currentSecret,
 
@@ -200,18 +232,17 @@ func (s *assetService) TransferAsset(
 
 	requestJson, err := json.Marshal(request)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	assetStr, err := s.smartContractService.CreateTransaction("TransferAsset", string(requestJson))
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	assetSigGraph := model_sig_graph.Asset{}
-	err = json.Unmarshal([]byte(assetStr), &assetSigGraph)
+	err = json.Unmarshal([]byte(assetStr), newAsset)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return &assetSigGraph, nil
+	return
 }

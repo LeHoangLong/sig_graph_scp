@@ -39,7 +39,7 @@ type AssetTransferServiceI interface {
 		message string,
 		isNewConnectionSecretOrPublic bool,
 		toInformSenderOfNewId bool,
-	) error
+	) (updatedRequest *model_asset_transfer.RequestToAcceptAsset, newSecret string, oldSecret string, err error)
 
 	SetNumberOfCandidatesSignature(ctx context.Context, numberOfCandidate uint32) error
 }

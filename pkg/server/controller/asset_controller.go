@@ -2,7 +2,6 @@ package controller_server
 
 import (
 	"context"
-	"crypto/sha512"
 	"fmt"
 	"math"
 	model_server "sig_graph_scp/pkg/server/model"
@@ -15,10 +14,11 @@ import (
 )
 
 type assetController struct {
-	api                api_sig_graph.SigGraphClientApi
-	repository         repository_server.AssetRepositoryI
-	keyRepository      repository_server.UserKeyRepositoryI
-	transactionManager repository_server.TransactionManagerI
+	api                  api_sig_graph.SigGraphClientApi
+	repository           repository_server.AssetRepositoryI
+	keyRepository        repository_server.UserKeyRepositoryI
+	transactionManager   repository_server.TransactionManagerI
+	hashGeneratorService utility.HashedIdGeneratorServiceI
 }
 
 func NewAssetController(
@@ -26,12 +26,14 @@ func NewAssetController(
 	repository repository_server.AssetRepositoryI,
 	keyRepository repository_server.UserKeyRepositoryI,
 	transactionManager repository_server.TransactionManagerI,
+	hashGeneratorService utility.HashedIdGeneratorServiceI,
 ) AssetControllerI {
 	return &assetController{
-		api:                api,
-		repository:         repository,
-		keyRepository:      keyRepository,
-		transactionManager: transactionManager,
+		api:                  api,
+		repository:           repository,
+		keyRepository:        keyRepository,
+		transactionManager:   transactionManager,
+		hashGeneratorService: hashGeneratorService,
 	}
 }
 
@@ -117,15 +119,17 @@ func (c *assetController) CreateAsset(
 		thisSecret := ingredientSecretIds[i]
 
 		if thisSecret != "" {
-			thisSecretId := fmt.Sprintf("%s%s", thisId, thisSecret)
-			thisSum := sha512.Sum512([]byte(thisSecretId))
-			thisHash := string(thisSum[:])
+			thisHash, err := c.hashGeneratorService.GenerateHashedId(ctx, string(thisId), thisSecret)
+			if err != nil {
+				return nil, err
+			}
 
 			otherId := asset.Id
 			otherSecret := secretIds[i]
-			otherSecretId := fmt.Sprintf("%s%s", otherId, otherSecret)
-			otherSum := sha512.Sum512([]byte(otherSecretId))
-			otherHash := string(otherSum[:])
+			otherHash, err := c.hashGeneratorService.GenerateHashedId(ctx, string(otherId), otherSecret)
+			if err != nil {
+				return nil, err
+			}
 
 			privateId := model_server.PrivateId{
 				ThisId:     thisId,

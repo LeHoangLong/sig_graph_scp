@@ -30,5 +30,5 @@ type AssetServiceI interface {
 		newSecret string,
 		currentSecret string,
 		currentSignature string,
-	) (*model_sig_graph.Asset, error)
+	) (updatedCurrentAsset *model_sig_graph.Asset, newAsset *model_sig_graph.Asset, err error)
 }

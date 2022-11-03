@@ -133,8 +133,6 @@ func (r *peerRepositoryGorm) FetchPeersByUser(
 		return nil, err
 	}
 
-	fmt.Println("peers ", len(peers))
-
 	modelPeers := make([]model_server.Peer, 0, len(peers))
 	for i := range peers {
 		modelPeers = append(modelPeers, toModelServerPeer(&peers[i]))

@@ -34,12 +34,14 @@ type SigGraphClientApi interface {
 		newSecret string,
 		currentSecret string,
 		currentSignature string,
-	) (*model_sig_graph.Asset, error)
+	) (updatedCurrentAsset *model_sig_graph.Asset, newAsset *model_sig_graph.Asset, err error)
+	GetGraphName() string
 }
 
 type sigGraphClientApi struct {
 	assetService service_sig_graph.AssetServiceI
 	nodeService  service_sig_graph.NodeServiceI
+	graphName    string
 }
 
 func NewAssetClientApi(graphName string) (SigGraphClientApi, error) {
@@ -51,13 +53,27 @@ func NewAssetClientApi(graphName string) (SigGraphClientApi, error) {
 	nodeSigningService := service_sig_graph.NewNodeSigningService()
 	idGeneratorService := service_sig_graph.NewIdGenerateServiceUuid(graphName)
 	clockWall := utility.NewClockWall()
+	hashGenerator := utility.NewHashedIdGeneratorService()
+	cloner := utility.NewCloner()
 
 	nodeSigGraphService := service_sig_graph.NewNodeService(smartContractService)
-	assetSigGraphService := service_sig_graph.NewAssetService(smartContractService, clockWall, idGeneratorService, nodeSigningService)
+	assetSigGraphService := service_sig_graph.NewAssetService(
+		smartContractService,
+		clockWall,
+		idGeneratorService,
+		nodeSigningService,
+		hashGenerator,
+		cloner,
+	)
 	return &sigGraphClientApi{
 		assetService: assetSigGraphService,
 		nodeService:  nodeSigGraphService,
+		graphName:    graphName,
 	}, nil
+}
+
+func (a *sigGraphClientApi) GetGraphName() string {
+	return a.graphName
 }
 
 func (a *sigGraphClientApi) DoNodeIdsExists(ctx context.Context, ids map[string]bool) (map[string]bool, error) {
@@ -101,7 +117,7 @@ func (a *sigGraphClientApi) TransferAsset(
 	newSecret string,
 	currentSecret string,
 	currentSignature string,
-) (*model_sig_graph.Asset, error) {
+) (updatedCurrentAsset *model_sig_graph.Asset, newAsset *model_sig_graph.Asset, err error) {
 	return a.assetService.TransferAsset(
 		ctx,
 		time_ms,

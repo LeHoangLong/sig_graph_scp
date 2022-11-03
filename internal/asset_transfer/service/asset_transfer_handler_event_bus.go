@@ -2,7 +2,6 @@ package service_asset_transfer
 
 import (
 	"context"
-	"fmt"
 	model_asset_transfer "sig_graph_scp/pkg/asset_transfer/model"
 	"time"
 
@@ -31,9 +30,8 @@ func (s *assetTransferHandlerEventBus) HandleAssetTransfer(
 	exposedSecretIds map[string]model_asset_transfer.PrivateId,
 	candidates []model_asset_transfer.CandidateId,
 ) error {
-	fmt.Println("handle request to asset accept ", s.topicName)
 	request := model_asset_transfer.RequestToAcceptAssetEvent{
-		TimeMs:                    uint64(requestTime.Unix()),
+		TimeMs:                    uint64(requestTime.UnixMilli()),
 		AssetId:                   assetId,
 		AckId:                     ackId,
 		PeerPemPublicKey:          senderPublicKey,

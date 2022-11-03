@@ -2,7 +2,6 @@ package service_asset_transfer
 
 import (
 	"context"
-	"fmt"
 	model_asset_transfer "sig_graph_scp/pkg/asset_transfer/model"
 
 	EventBus "github.com/asaskevich/eventbus"
@@ -33,7 +32,6 @@ func (s *assetAcceptHandlerEventBus) HandleAssetAccept(
 	oldId string,
 	oldSecret string,
 ) {
-	fmt.Println("handle asset accept ", s.topicName)
 	event := model_asset_transfer.AcceptAssetEvent{
 		AckId:      ackId,
 		IsAccepted: isAcceptedOrRejected,

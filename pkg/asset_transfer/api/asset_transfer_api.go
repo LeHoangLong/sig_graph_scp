@@ -5,6 +5,7 @@ import (
 	service_asset_transfer "sig_graph_scp/internal/asset_transfer/service"
 	service_sig_graph "sig_graph_scp/internal/sig_graph/service"
 	model_asset_transfer "sig_graph_scp/pkg/asset_transfer/model"
+	api_sig_graph "sig_graph_scp/pkg/sig_graph/api"
 	model_sig_graph "sig_graph_scp/pkg/sig_graph/model"
 	"sig_graph_scp/pkg/utility"
 	"time"
@@ -29,7 +30,7 @@ type AssetTransferServiceApi interface {
 		message string,
 		isNewConnectionSecretOrPublic bool,
 		toInformSenderOfNewId bool,
-	) error
+	) (updatedRequest *model_asset_transfer.RequestToAcceptAsset, newSecret string, oldSecret string, err error)
 }
 
 type Options struct {
@@ -41,15 +42,17 @@ type assetTransferServiceApi struct {
 	assetTransferService service_asset_transfer.AssetTransferServiceI
 }
 
-func NewAssetTransferServiceApi(graphName string, options *Options) (AssetTransferServiceApi, error) {
+func NewAssetTransferServiceApi(sigGraphClientApi api_sig_graph.SigGraphClientApi, options *Options) (AssetTransferServiceApi, error) {
 	connPool := utility.NewGrpcConnectionPool()
 	numberOfCandidates := uint32(6)
 	if options != nil {
 		numberOfCandidates = options.NumberOfCandidates
 	}
 	secretGenerator := service_asset_transfer.NewSecretIdGeneratorCrypto(20)
-	idGenerator := service_sig_graph.NewIdGenerateServiceUuid(graphName)
+	idGenerator := service_sig_graph.NewIdGenerateServiceUuid(sigGraphClientApi.GetGraphName())
 	nodeSigningService := service_sig_graph.NewNodeSigningService()
+	hashGenerator := utility.NewHashedIdGeneratorService()
+	cloner := utility.NewCloner()
 
 	assetTransferService := service_asset_transfer.NewAssetTransferServiceGrpc(
 		connPool,
@@ -57,6 +60,9 @@ func NewAssetTransferServiceApi(graphName string, options *Options) (AssetTransf
 		secretGenerator,
 		idGenerator,
 		nodeSigningService,
+		sigGraphClientApi,
+		hashGenerator,
+		cloner,
 	)
 
 	return &assetTransferServiceApi{
@@ -92,7 +98,7 @@ func (s *assetTransferServiceApi) AcceptRequestToAcceptAsset(
 	message string,
 	isNewConnectionSecretOrPublic bool,
 	toInformSenderOfNewId bool,
-) error {
+) (updatedRequest *model_asset_transfer.RequestToAcceptAsset, newSecret string, oldSecret string, err error) {
 	return s.assetTransferService.AcceptRequestToAcceptAsset(
 		ctx,
 		peer,

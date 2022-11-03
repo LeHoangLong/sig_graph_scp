@@ -177,6 +177,7 @@ func gormNodeToModelNode(node gormNode) model_server.Node {
 	}
 
 	modelNode := model_server.Node{
+		NodeType:           node.NodeType,
 		NodeDbId:           model_server.NodeDbId(node.ID),
 		Id:                 model_server.NodeId(node.NodeID),
 		Namespace:          node.Namespace,

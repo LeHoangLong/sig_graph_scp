@@ -21,6 +21,7 @@ type RequestToAcceptAsset struct {
 	Time                      uint64                            `json:"time"`
 	AckId                     string                            `json:"ack_id"`
 	AssetId                   NodeDbId                          `json:"asset_id"`
+	NewAssetId                *NodeDbId                         `json:"new_asset_id"`
 	PeerId                    PeerDbId                          `json:"peer_id"`
 	UserId                    UserId                            `json:"user_id"`
 	ExposedPrivateConnections map[string]PrivateId              `json:"exposed_private_connections"`
@@ -30,6 +31,7 @@ type RequestToAcceptAsset struct {
 
 func ToAssetTransferRequestToAcceptAsset(
 	asset *model_sig_graph.Asset,
+	newAsset *model_sig_graph.Asset,
 	peerPemPublicKey string,
 	userKeyPair model_sig_graph.UserKeyPair,
 	request *RequestToAcceptAsset,
@@ -62,6 +64,7 @@ func ToAssetTransferRequestToAcceptAsset(
 		TimeMs:                    request.Time,
 		AckId:                     request.AckId,
 		Asset:                     *asset,
+		NewAsset:                  newAsset,
 		PeerPemPublicKey:          peerPemPublicKey,
 		UserKeyPair:               userKeyPair,
 		ExposedPrivateConnections: privateConnections,
@@ -72,6 +75,7 @@ func ToAssetTransferRequestToAcceptAsset(
 func FromAssetTransferRequestToAcceptAsset(
 	Id RequestId,
 	AssetId NodeDbId,
+	NewAssetId *NodeDbId,
 	PeerId PeerDbId,
 	UserId UserId,
 	AcceptMessage string,
@@ -106,6 +110,7 @@ func FromAssetTransferRequestToAcceptAsset(
 		Time:                      request.TimeMs,
 		AckId:                     request.AckId,
 		AssetId:                   AssetId,
+		NewAssetId:                NewAssetId,
 		PeerId:                    PeerId,
 		UserId:                    UserId,
 		ExposedPrivateConnections: exposedSecretIds,

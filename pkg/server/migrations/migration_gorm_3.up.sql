@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS gorm_request_to_accept_assets (
     request_time_ms BIGINT NOT NULL,
     ack_id VARCHAR(1024) NOT NULL,
     asset_id BIGINT NOT NULL REFERENCES gorm_nodes(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    new_asset_id BIGINT REFERENCES gorm_nodes(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     peer_id BIGINT NOT NULL REFERENCES gorm_peers(id) ON DELETE CASCADE ON UPDATE CASCADE,
     user_id BIGINT NOT NULL,
     accept_message VARCHAR(8192) NOT NULL

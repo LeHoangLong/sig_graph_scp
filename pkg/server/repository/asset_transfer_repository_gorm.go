@@ -2,7 +2,7 @@ package repository_server
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"sig_graph_scp/pkg/model"
 	model_server "sig_graph_scp/pkg/server/model"
 )
@@ -40,6 +40,7 @@ type gormRequestToAcceptAsset struct {
 	Time                      uint64 `gorm:"column:request_time_ms"`
 	AckId                     string
 	AssetId                   model_server.NodeDbId
+	NewAssetId                sql.NullInt64
 	PeerId                    model_server.PeerDbId
 	UserId                    model_server.UserId
 	ExposedPrivateConnections []gormRequestToAcceptAssetExposedPrivateId `gorm:"foreignKey:RequestId"`
@@ -131,7 +132,6 @@ func (r *assetTransferRepositoryGorm) FetchAssetAcceptRequestsById(
 	err = tx.Preload("ExposedPrivateConnections").Preload("CandidateIds").Where("user_id = ? AND id = ?", user.ID, id).
 		First(&gormRequest).Error
 	if err != nil {
-		fmt.Println("err ", err)
 		return nil, err
 	}
 
@@ -163,6 +163,12 @@ func (r *assetTransferRepositoryGorm) FetchAssetAcceptRequestsByAckId(
 }
 
 func toModelRequest(gormRequest *gormRequestToAcceptAsset) model_server.RequestToAcceptAsset {
+	var newAssetId *model_server.NodeDbId = nil
+	if gormRequest.NewAssetId.Valid {
+		newAssetId = new(model_server.NodeDbId)
+		*newAssetId = model_server.NodeDbId(gormRequest.NewAssetId.Int64)
+	}
+
 	modelRequest := model_server.RequestToAcceptAsset{
 		Id:                        gormRequest.ID,
 		Status:                    gormRequest.Status,
@@ -170,6 +176,7 @@ func toModelRequest(gormRequest *gormRequestToAcceptAsset) model_server.RequestT
 		Time:                      gormRequest.Time,
 		AckId:                     gormRequest.AckId,
 		AssetId:                   gormRequest.AssetId,
+		NewAssetId:                newAssetId,
 		PeerId:                    gormRequest.PeerId,
 		UserId:                    gormRequest.UserId,
 		AcceptMessage:             gormRequest.AcceptMessage,
@@ -199,12 +206,21 @@ func toModelRequest(gormRequest *gormRequestToAcceptAsset) model_server.RequestT
 func fromRequestToAcceptAsset(
 	request *model_server.RequestToAcceptAsset,
 ) gormRequestToAcceptAsset {
+	newAssetId := sql.NullInt64{}
+	if request.NewAssetId != nil {
+		newAssetId.Valid = true
+		newAssetId.Int64 = int64(*request.NewAssetId)
+	} else {
+		newAssetId.Valid = false
+	}
+
 	gormRequest := gormRequestToAcceptAsset{
 		ID:                        request.Id,
 		Status:                    request.Status,
 		IsOutboundOrInbound:       request.IsOutboundOrInbound,
 		Time:                      request.Time,
 		AckId:                     request.AckId,
+		NewAssetId:                newAssetId,
 		AssetId:                   request.AssetId,
 		PeerId:                    request.PeerId,
 		UserId:                    request.UserId,
