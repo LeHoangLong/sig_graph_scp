@@ -160,6 +160,7 @@ func main() {
 		// asset
 		api.GET("/assets", auth.Authenticate, assetView.GetAssetById)
 		api.POST("/assets", auth.Authenticate, assetView.CreateAsset)
+		api.GET("/assets/db_ids", auth.Authenticate, assetView.GetAssetByDbId)
 
 		// user key pair
 		api.GET("/key_pairs", auth.Authenticate, userKeyPairView.GetUserKeyPairsByUser)

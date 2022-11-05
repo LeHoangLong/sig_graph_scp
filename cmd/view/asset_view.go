@@ -85,3 +85,35 @@ func (v *assetView) GetAssetById(c *gin.Context) {
 	c.JSON(http.StatusOK, asset)
 	return
 }
+
+type GetAssetByDbIdRequest struct {
+	Ids []uint64 `form:"ids"`
+}
+
+func (v *assetView) GetAssetByDbId(c *gin.Context) {
+	user := middleware.GetUser(c.Request.Context())
+
+	request := GetAssetByDbIdRequest{}
+	if err := c.ShouldBind(&request); err != nil {
+		utility.AbortBadRequest(c, err)
+		return
+	}
+
+	idsMap := map[model_server.NodeDbId]bool{}
+	for _, id := range request.Ids {
+		idsMap[model_server.NodeDbId(id)] = true
+	}
+
+	assets, err := v.controller.GetAssetsFromCacheByDbId(
+		c.Request.Context(),
+		user,
+		idsMap,
+	)
+	if err != nil {
+		utility.AbortWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, assets)
+	return
+}

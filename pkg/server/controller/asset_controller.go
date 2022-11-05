@@ -180,7 +180,17 @@ func (c *assetController) GetAssetById(ctx context.Context, user *model_server.U
 		return nil, err
 	}
 
-	modelNode := model_server.FromSigGraphNode(&asset.Node, 0, fmt.Sprintf("%d", user.ID), map[string]model_server.PrivateId{}, map[string]model_server.PrivateId{})
+	privateParentIds := map[string]model_server.PrivateId{}
+	for hash := range asset.PrivateParentsHashedIds {
+		privateParentIds[hash] = model_server.PrivateId{}
+	}
+
+	privateChildrenIds := map[string]model_server.PrivateId{}
+	for hash := range asset.PrivateChildrenHashedIds {
+		privateChildrenIds[hash] = model_server.PrivateId{}
+	}
+
+	modelNode := model_server.FromSigGraphNode(&asset.Node, 0, fmt.Sprintf("%d", user.ID), privateParentIds, privateChildrenIds)
 	modelAsset := model_server.FromSigGraphAsset(asset, &modelNode)
 
 	c.repository.SaveAsset(ctx, transactionId, &modelAsset)
@@ -221,6 +231,27 @@ func (c *assetController) GetOwnedAssetsFromCache(
 			return nil, err
 		}
 		ret = append(ret, assets...)
+	}
+
+	return ret, nil
+}
+
+func (c *assetController) GetAssetsFromCacheByDbId(
+	ctx context.Context,
+	user *model_server.User,
+	ids map[model_server.NodeDbId]bool,
+) ([]model_server.Asset, error) {
+	transactionId, err := c.transactionManager.BypassTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer c.transactionManager.StopBypassedTransaction(ctx, transactionId)
+
+	ret := []model_server.Asset{}
+	namespace := fmt.Sprintf("%d", user.ID)
+	ret, err = c.repository.FetchAssetsByDbIds(ctx, transactionId, namespace, ids)
+	if err != nil {
+		return nil, err
 	}
 
 	return ret, nil

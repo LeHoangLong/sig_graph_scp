@@ -401,12 +401,12 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 	}
 
 	// save new asset to repository
-	updatedCurrentAsset, newAsset, err := c.updateCurrentAssetAndAddNewAsset(
+	updatedCurrentAsset, newAsset, err := c.updateCurrentAssetAndNewAsset(
 		ctx,
 		user,
-		request.AssetId,
 		assetTransferRequest.NewAsset.Id,
 		newSecret,
+		assetTransferRequest.Asset.Id,
 		oldSecret,
 	)
 	if err != nil {
@@ -500,12 +500,52 @@ func (c *assetTransferController) newAcceptAssetReceivedHandler(
 		request.AcceptMessage = event.Message
 		request.AssetId = updatedAsset.NodeDbId
 		request.NewAssetId = &newAsset.NodeDbId
-		c.assetTransferRepository.UpdateAssetAcceptRequest(
+		err = c.assetTransferRepository.UpdateAssetAcceptRequest(
 			ctx,
 			txId,
 			request,
 		)
+
+		if err != nil {
+			return
+		}
 	}
+}
+
+func (c *assetTransferController) updateCurrentAssetAndNewAsset(
+	ctx context.Context,
+	user *model_server.User,
+	newId string,
+	newSecret string,
+	oldId string,
+	oldSecret string,
+) (newAsset *model_server.Asset, oldAsset *model_server.Asset, err error) {
+	oldAsset, err = c.assetController.GetAssetById(
+		ctx,
+		user,
+		model_server.NodeId(oldId),
+		false,
+	)
+	if err != nil {
+		return
+	}
+
+	newAsset, err = c.assetController.GetAssetById(
+		ctx,
+		user,
+		model_server.NodeId(newId),
+		false,
+	)
+	if err != nil {
+		return
+	}
+
+	err = c.updatePrivateEdges(ctx, newId, newSecret, newAsset, oldId, oldSecret, oldAsset)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 // TODO: if this fail, we lose the new asset id information. So we need to
@@ -571,39 +611,60 @@ func (c *assetTransferController) updateCurrentAssetAndAddNewAsset(
 		model_server.NodeId(newId),
 		false,
 	)
+	if err != nil {
+		return
+	}
 
+	// update current and new asset's private edge toward the new asset
+	err = c.updatePrivateEdges(ctx, newId, newSecret, newAsset, string(updatedCurrentAsset.Id), oldSecret, updatedCurrentAsset)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (c *assetTransferController) updatePrivateEdges(
+	ctx context.Context,
+	newId string,
+	newSecret string,
+	newAsset *model_server.Asset,
+	oldId string,
+	oldSecret string,
+	oldAsset *model_server.Asset,
+) error {
 	// update current and new asset's private edge toward the new asset
 	newHash, oldHash, err := c.generateHashId(
 		ctx,
 		newId,
 		newSecret,
-		string(currentAsset.Id),
+		oldId,
 		oldSecret,
 	)
 	if err != nil {
-		return
+		return err
 	}
 
 	if newSecret != "" {
 		var newNode *model_server.Node
 		newNode, err = c.nodeController.UpdateNodeSecretId(
 			ctx,
-			&currentAsset.Node,
+			&oldAsset.Node,
 			map[string]model_server.PrivateId{
 				newHash: {
 					ThisId:      model_server.NodeId(newId),
 					ThisSecret:  newSecret,
 					ThisHash:    newHash,
-					OtherId:     currentAsset.Id,
+					OtherId:     oldAsset.Id,
 					OtherSecret: oldSecret,
 					OtherHash:   oldHash,
 				},
 			},
 		)
 		if err != nil {
-			return
+			return err
 		}
-		updatedCurrentAsset.Node = *newNode
+		oldAsset.Node = *newNode
 	}
 
 	if oldSecret != "" {
@@ -613,7 +674,7 @@ func (c *assetTransferController) updateCurrentAssetAndAddNewAsset(
 			&newAsset.Node,
 			map[string]model_server.PrivateId{
 				oldHash: {
-					ThisId:      currentAsset.Id,
+					ThisId:      oldAsset.Id,
 					ThisSecret:  oldSecret,
 					ThisHash:    oldHash,
 					OtherId:     model_server.NodeId(newId),
@@ -623,12 +684,12 @@ func (c *assetTransferController) updateCurrentAssetAndAddNewAsset(
 			},
 		)
 		if err != nil {
-			return
+			return err
 		}
 		newAsset.Node = *newNode
 	}
 
-	return
+	return nil
 }
 
 func (c *assetTransferController) generateHashId(

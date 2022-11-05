@@ -77,6 +77,23 @@ func (r *assetTransferRepositoryGorm) UpdateAssetAcceptRequest(
 		return err
 	}
 	gormRequest := fromRequestToAcceptAsset(request)
+
+	for i := range gormRequest.CandidateIds {
+		gormRequest.CandidateIds[i].RequestId = gormRequest.ID
+	}
+	err = tx.Model(&gormRequest).Association("CandidateIds").Replace(gormRequest.CandidateIds)
+	if err != nil {
+		return err
+	}
+
+	for i := range gormRequest.ExposedPrivateConnections {
+		gormRequest.ExposedPrivateConnections[i].RequestId = gormRequest.ID
+	}
+	err = tx.Model(&gormRequest).Association("ExposedPrivateConnections").Replace(gormRequest.ExposedPrivateConnections)
+	if err != nil {
+		return err
+	}
+
 	err = tx.Save(&gormRequest).Error
 	if err != nil {
 		return err

@@ -32,20 +32,19 @@ type gormNode struct {
 	Signature      string `gorm:"column:node_signature;not null"`
 	OwnerPublicKey string `gorm:"not null"`
 
-	PublicParentsIds  []gormPublicEdge `gorm:"foreignKey:NodeDbId"`
-	PublicChildrenIds []gormPublicEdge `gorm:"foreignKey:NodeDbId"`
-
-	PrivateParentsIds  []gormPrivateEdge `gorm:"foreignKey:NodeDbId"`
-	PrivateChildrenIds []gormPrivateEdge `gorm:"foreignKey:NodeDbId"`
+	PublicEdges  []gormPublicEdge  `gorm:"foreignKey:NodeDbId"`
+	PrivateEdges []gormPrivateEdge `gorm:"foreignKey:NodeDbId"`
 }
 
 type gormPublicEdge struct {
-	NodeDbId uint64 `gorm:"primaryKey,priority:1"`
-	Value    string `gorm:"column:other_node_id;primaryKey,priority:2"`
+	NodeDbId            uint64 `gorm:"primaryKey,priority:1"`
+	Value               string `gorm:"column:other_node_id;primaryKey,prsority:2"`
+	IsThisNodeTheParent bool
 }
 
 type gormPrivateEdge struct {
-	NodeDbId uint64 `gorm:"primaryKey,priority:1"`
+	NodeDbId            uint64 `gorm:"primaryKey,priority:1"`
+	IsThisNodeTheParent bool
 
 	ThisId     model_server.NodeId `gorm:"column:this_node_id"`
 	ThisHash   string              `gorm:"primaryKey,priority:2"`
@@ -79,42 +78,18 @@ func (r *nodeRepositoryGorm) UpsertNode(
 
 	for publicParent := range iNode.PublicParentsIds {
 		id := gormPublicEdge{
-			Value: publicParent,
+			Value:               publicParent,
+			IsThisNodeTheParent: false,
 		}
-		gormNode.PublicParentsIds = append(gormNode.PublicParentsIds, id)
+		gormNode.PublicEdges = append(gormNode.PublicEdges, id)
 	}
 
 	for publicChildren := range iNode.PublicChildrenIds {
 		id := gormPublicEdge{
-			Value: publicChildren,
+			Value:               publicChildren,
+			IsThisNodeTheParent: true,
 		}
-		gormNode.PublicParentsIds = append(gormNode.PublicParentsIds, id)
-	}
-
-	for _, privateParent := range iNode.PrivateParentsIds {
-		id := gormPrivateEdge{
-			ThisId:     privateParent.ThisId,
-			ThisHash:   privateParent.ThisHash,
-			ThisSecret: privateParent.ThisHash,
-
-			OtherId:     privateParent.OtherId,
-			OtherHash:   privateParent.OtherHash,
-			OtherSecret: privateParent.OtherHash,
-		}
-		gormNode.PrivateParentsIds = append(gormNode.PrivateParentsIds, id)
-	}
-
-	for _, privateChildren := range iNode.PrivateChildrenIds {
-		id := gormPrivateEdge{
-			ThisId:     privateChildren.ThisId,
-			ThisHash:   privateChildren.ThisHash,
-			ThisSecret: privateChildren.ThisHash,
-
-			OtherId:     privateChildren.OtherId,
-			OtherHash:   privateChildren.OtherHash,
-			OtherSecret: privateChildren.OtherHash,
-		}
-		gormNode.PrivateChildrenIds = append(gormNode.PrivateChildrenIds, id)
+		gormNode.PublicEdges = append(gormNode.PublicEdges, id)
 	}
 
 	err = tx.Clauses(
@@ -131,49 +106,82 @@ func (r *nodeRepositoryGorm) UpsertNode(
 				{Name: "id"},
 			},
 		},
-	).Create(&gormNode).Error
+	).Omit("PrivateChildrenIds").Omit("PrivateParentsIds").Create(&gormNode).Error
+	if err != nil {
+		return err
+	}
+
+	for thisHash, privateParent := range iNode.PrivateParentsIds {
+		id := gormPrivateEdge{
+			NodeDbId:            gormNode.ID,
+			IsThisNodeTheParent: false,
+
+			ThisId:     privateParent.ThisId,
+			ThisHash:   thisHash,
+			ThisSecret: privateParent.ThisSecret,
+
+			OtherId:     privateParent.OtherId,
+			OtherHash:   privateParent.OtherHash,
+			OtherSecret: privateParent.OtherSecret,
+		}
+		gormNode.PrivateEdges = append(gormNode.PrivateEdges, id)
+	}
+
+	for thisHash, privateChildren := range iNode.PrivateChildrenIds {
+		id := gormPrivateEdge{
+			NodeDbId:            gormNode.ID,
+			IsThisNodeTheParent: true,
+
+			ThisId:     privateChildren.ThisId,
+			ThisHash:   thisHash,
+			ThisSecret: privateChildren.ThisSecret,
+
+			OtherId:     privateChildren.OtherId,
+			OtherHash:   privateChildren.OtherHash,
+			OtherSecret: privateChildren.OtherSecret,
+		}
+		gormNode.PrivateEdges = append(gormNode.PrivateEdges, id)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(gormNode.PrivateEdges) != 0 {
+		err = tx.Clauses(
+			clause.OnConflict{
+				Columns: []clause.Column{
+					{Name: "node_db_id"},
+					{Name: "this_hash"},
+				},
+				UpdateAll: true,
+			},
+		).Create(gormNode.PrivateEdges).Error
+	}
 
 	iNode.NodeDbId = model_server.NodeDbId(gormNode.ID)
-	return err
+	return nil
 }
 
 func gormNodeToModelNode(node gormNode) model_server.Node {
 	publicParentsIds := map[string]bool{}
-	for _, id := range node.PublicParentsIds {
-		publicParentsIds[id.Value] = true
-	}
-
 	publicChildrenIds := map[string]bool{}
-	for _, id := range node.PublicChildrenIds {
-		publicChildrenIds[id.Value] = true
+	for _, id := range node.PublicEdges {
+		if id.IsThisNodeTheParent {
+			publicChildrenIds[id.Value] = true
+		} else {
+			publicParentsIds[id.Value] = true
+		}
 	}
 
 	privateParentsIds := map[string]model_server.PrivateId{}
-	for _, id := range node.PrivateParentsIds {
-		privateId := model_server.PrivateId{
-			ThisId:     id.ThisId,
-			ThisHash:   id.ThisHash,
-			ThisSecret: id.ThisHash,
-
-			OtherId:     id.OtherId,
-			OtherHash:   id.OtherHash,
-			OtherSecret: id.OtherHash,
-		}
-		privateParentsIds[id.ThisHash] = privateId
-	}
-
 	privateChildrenIds := map[string]model_server.PrivateId{}
-	for _, id := range node.PrivateChildrenIds {
-		privateId := model_server.PrivateId{
-			ThisId:     id.ThisId,
-			ThisHash:   id.ThisHash,
-			ThisSecret: id.ThisHash,
-
-			OtherId:     id.OtherId,
-			OtherHash:   id.OtherHash,
-			OtherSecret: id.OtherHash,
+	for _, id := range node.PrivateEdges {
+		privateId := toModelServePrivateId(&id)
+		if id.IsThisNodeTheParent {
+			privateChildrenIds[id.ThisHash] = privateId
+		} else {
+			privateParentsIds[id.ThisHash] = privateId
 		}
-		privateChildrenIds[id.ThisHash] = privateId
 	}
 
 	modelNode := model_server.Node{
@@ -197,6 +205,7 @@ func gormNodeToModelNode(node gormNode) model_server.Node {
 func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(
 	ctx context.Context,
 	transactionId TransactionId,
+	namespace string,
 	nodeType string,
 	ownerPublicKey string,
 	pagination PaginationOption[model_server.NodeDbId],
@@ -208,7 +217,10 @@ func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(
 		return []model_server.Node{}, err
 	}
 
-	tx.Where("owner_public_key = ? AND node_type = ? AND id >= ?", ownerPublicKey, nodeType, pagination.MinId).Limit(int(pagination.Limit)).Order("id asc").Find(&nodes)
+	err = tx.Preload("PublicEdges").Preload("PrivateEdges").Where("node_namespace = ? AND owner_public_key = ? AND node_type = ? AND id >= ?", namespace, ownerPublicKey, nodeType, pagination.MinId).Limit(int(pagination.Limit)).Order("id asc").Find(&nodes).Error
+	if err != nil {
+		return []model_server.Node{}, err
+	}
 
 	ret := []model_server.Node{}
 	for i := range nodes {
@@ -236,7 +248,7 @@ func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 	}
 
 	nodes := []gormNode{}
-	err = tx.Where("node_namespace = ? AND node_id IN ? AND node_type = ?", namespace, ids, nodeType).Find(&nodes).Error
+	err = tx.Preload("PublicEdges").Preload("PrivateEdges").Where("node_namespace = ? AND node_id IN ? AND node_type = ?", namespace, ids, nodeType).Find(&nodes).Error
 	if err != nil {
 		return []model_server.Node{}, err
 	}
@@ -267,7 +279,7 @@ func (r *nodeRepositoryGorm) FetchNodesByDbId(
 	}
 
 	nodes := []gormNode{}
-	err = tx.Where("node_namespace = ? AND id IN ? AND node_type = ?", namespace, ids, nodeType).Find(&nodes).Error
+	err = tx.Preload("PublicEdges").Preload("PrivateEdges").Where("node_namespace = ? AND id IN ? AND node_type = ?", namespace, ids, nodeType).Find(&nodes).Error
 	if err != nil {
 		return []model_server.Node{}, err
 	}
@@ -321,15 +333,21 @@ func (r *nodeRepositoryGorm) FetchPrivateEdgesByNodeIds(
 
 	privateEdges := make([]model_server.PrivateId, 0, len(gormPrivateEdges))
 	for i := range gormPrivateEdges {
-		privateEdges = append(privateEdges, model_server.PrivateId{
-			ThisId:     gormPrivateEdges[i].ThisId,
-			ThisSecret: gormPrivateEdges[i].ThisSecret,
-			ThisHash:   gormPrivateEdges[i].ThisHash,
-
-			OtherId:     gormPrivateEdges[i].OtherId,
-			OtherSecret: gormPrivateEdges[i].OtherSecret,
-			OtherHash:   gormPrivateEdges[i].OtherHash,
-		})
+		privateEdges = append(privateEdges, toModelServePrivateId(&gormPrivateEdges[i]))
 	}
 	return privateEdges, nil
+}
+
+func toModelServePrivateId(
+	privateId *gormPrivateEdge,
+) model_server.PrivateId {
+	return model_server.PrivateId{
+		ThisId:     privateId.ThisId,
+		ThisSecret: privateId.ThisSecret,
+		ThisHash:   privateId.ThisHash,
+
+		OtherId:     privateId.OtherId,
+		OtherSecret: privateId.OtherSecret,
+		OtherHash:   privateId.OtherHash,
+	}
 }

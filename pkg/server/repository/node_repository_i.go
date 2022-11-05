@@ -12,7 +12,7 @@ type EdgeNodeId struct {
 
 type NodeRepositoryI interface {
 	UpsertNode(ctx context.Context, transactionId TransactionId, node *model_server.Node) error
-	FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType string, ownerPublicKey string, pagination PaginationOption[model_server.NodeDbId]) ([]model_server.Node, error)
+	FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, ownerPublicKey string, pagination PaginationOption[model_server.NodeDbId]) ([]model_server.Node, error)
 	FetchNodesByNodeId(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, id map[model_server.NodeId]bool) ([]model_server.Node, error)
 	FetchNodesByDbId(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, id map[model_server.NodeDbId]bool) ([]model_server.Node, error)
 	FetchPrivateEdgesByNodeIds(ctx context.Context, transactionId TransactionId, namespace string, edges []EdgeNodeId) ([]model_server.PrivateId, error)

@@ -14,11 +14,14 @@ CREATE TABLE IF NOT EXISTS gorm_nodes (
 CREATE TABLE IF NOT EXISTS gorm_public_edges (
     node_db_id BIGINT REFERENCES gorm_nodes(id) ON UPDATE CASCADE ON DELETE CASCADE,
     other_node_id VARCHAR(1024) NOT NULL,
+    is_this_node_the_parent BOOLEAN,
     PRIMARY KEY(node_db_id, other_node_id)
 );
 
 CREATE TABLE IF NOT EXISTS gorm_private_edges (
     node_db_id BIGINT REFERENCES gorm_nodes(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    
+    is_this_node_the_parent BOOLEAN,
     
     this_hash VARCHAR(1024) NOT NULL, 
     this_node_id VARCHAR(1024),

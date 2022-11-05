@@ -40,6 +40,12 @@ func (s *nodeService) UpdateNodeSecretId(
 		}
 	}
 
+	for hash := range updatedNode.PrivateParentsIds {
+		if privateId, ok := secretIds[hash]; ok {
+			updatedNode.PrivateParentsIds[hash] = privateId
+		}
+	}
+
 	err := s.nodeRepository.UpsertNode(ctx, txId, &updatedNode)
 	if err != nil {
 		return nil, err

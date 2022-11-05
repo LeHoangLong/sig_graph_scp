@@ -33,4 +33,10 @@ type AssetControllerI interface {
 		user *model_server.User,
 		pagination repository_server.PaginationOption[model_server.NodeDbId],
 	) ([]model_server.Asset, error)
+
+	GetAssetsFromCacheByDbId(
+		ctx context.Context,
+		user *model_server.User,
+		ids map[model_server.NodeDbId]bool,
+	) ([]model_server.Asset, error)
 }
