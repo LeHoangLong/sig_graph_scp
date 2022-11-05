@@ -10,8 +10,23 @@ type EdgeNodeId struct {
 	Child  model_server.NodeId
 }
 
+// TODO: Add method to remove edge
+//
+//	NOTE: An edge is made up of the source and target vertex. This is different\
+//		from the parent-child relationship expressed in the SigGraph model. For example,
+//		an edge may be starting from either the child or the parent and the source will correspond
+//		to the starting point respectively.
+//
+// NOTE: An unknown edge is one where the target vertex is unknown (either the this_id or this_hash string is empty)
 type NodeRepositoryI interface {
-	UpsertNode(ctx context.Context, transactionId TransactionId, node *model_server.Node) error
+	// if existing node have more private id than iNode,
+	// then those extra edges won't be affected. The edges
+	// whose target vertex are known are also not affected.
+	// As a result, this function can only add new known / unknown
+	// edges or add vertex information to an existing unknown
+	// edge. You must use other methods if you want to delete an existing
+	// edge.
+	UpsertNode(ctx context.Context, transactionId TransactionId, iNode *model_server.Node) error
 	FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, ownerPublicKey string, pagination PaginationOption[model_server.NodeDbId]) ([]model_server.Node, error)
 	FetchNodesByNodeId(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, id map[model_server.NodeId]bool) ([]model_server.Node, error)
 	FetchNodesByDbId(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, id map[model_server.NodeDbId]bool) ([]model_server.Node, error)

@@ -146,6 +146,16 @@ func (r *nodeRepositoryGorm) UpsertNode(
 		}
 	}
 
+	// remove unknown private edges so that we can insert new ones
+	newHashes := make([]string, 0, len(gormNode.PrivateEdges))
+	for i := range gormNode.PrivateEdges {
+		newHashes = append(newHashes, gormNode.PrivateEdges[i].ThisHash)
+	}
+	err = tx.Where("node_db_id = ? AND this_hash IN ? AND (this_node_id='' OR this_hash='')", gormNode.ID, newHashes).Delete(&gormPrivateEdge{}).Error
+	if err != nil {
+		return err
+	}
+
 	if len(gormNode.PrivateEdges) != 0 {
 		err = tx.Clauses(
 			clause.OnConflict{
@@ -153,16 +163,23 @@ func (r *nodeRepositoryGorm) UpsertNode(
 					{Name: "node_db_id"},
 					{Name: "this_hash"},
 				},
-				UpdateAll: true,
+				DoNothing: true,
 			},
 		).Create(gormNode.PrivateEdges).Error
 	}
 
-	iNode.NodeDbId = model_server.NodeDbId(gormNode.ID)
+	gormNode.PrivateEdges = []gormPrivateEdge{}
+	err = tx.Model(&gormNode).Association("PrivateEdges").Find(&gormNode.PrivateEdges)
+	if err != nil {
+		return err
+	}
+
+	*iNode = gormNodeToModelNode(&gormNode)
+
 	return nil
 }
 
-func gormNodeToModelNode(node gormNode) model_server.Node {
+func gormNodeToModelNode(node *gormNode) model_server.Node {
 	publicParentsIds := map[string]bool{}
 	publicChildrenIds := map[string]bool{}
 	for _, id := range node.PublicEdges {
@@ -224,7 +241,7 @@ func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(
 
 	ret := []model_server.Node{}
 	for i := range nodes {
-		ret = append(ret, gormNodeToModelNode(nodes[i]))
+		ret = append(ret, gormNodeToModelNode(&nodes[i]))
 	}
 
 	return ret, nil
@@ -255,7 +272,7 @@ func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 
 	ret := []model_server.Node{}
 	for i := range nodes {
-		ret = append(ret, gormNodeToModelNode(nodes[i]))
+		ret = append(ret, gormNodeToModelNode(&nodes[i]))
 	}
 
 	return ret, nil
@@ -286,7 +303,7 @@ func (r *nodeRepositoryGorm) FetchNodesByDbId(
 
 	ret := []model_server.Node{}
 	for i := range nodes {
-		ret = append(ret, gormNodeToModelNode(nodes[i]))
+		ret = append(ret, gormNodeToModelNode(&nodes[i]))
 	}
 
 	return ret, nil
