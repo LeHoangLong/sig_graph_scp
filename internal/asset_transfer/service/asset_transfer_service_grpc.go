@@ -87,70 +87,50 @@ func (s *assetTransferServiceGrpc) TransferAsset(
 		}
 	}
 
-	if isNewConnectionSecretOrPublic {
-		for i := uint32(0); i < s.numberOfCandidate; i++ {
-			draftAsset := &model_sig_graph.Asset{}
-			err = s.cloner.Clone(ctx, asset, draftAsset)
-			if err != nil {
-				return nil, err
-			}
-			draftAsset.UpdatedTime = uint64(requestTime.UnixMilli())
-			id, err := s.idGeneratorService.NewFullId(ctx)
+	for i := uint32(0); i < s.numberOfCandidate; i++ {
+		// generate signature for this candidate
+		secret := ""
+		signature := ""
+		draftAsset := &model_sig_graph.Asset{}
+
+		err = s.cloner.Clone(ctx, asset, draftAsset)
+		if err != nil {
+			return nil, err
+		}
+		draftAsset.UpdatedTime = uint64(requestTime.UnixMilli())
+		draftAsset.IsFinalized = true
+
+		id, err := s.idGeneratorService.NewFullId(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		if isNewConnectionSecretOrPublic {
+			secret, err = s.secretIdGeneratorI.NewSecretId(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			secret, err := s.secretIdGeneratorI.NewSecretId(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			// generate signature for this candidate
 			hash, err := s.hashGeneratorService.GenerateHashedId(ctx, id, secret)
 			if err != nil {
 				return nil, err
 			}
 
 			draftAsset.PrivateChildrenHashedIds[hash] = true
-			signature, err := s.nodeSigningService.Sign(ctx, ownerKey, &draftAsset)
-			if err != nil {
-				return nil, err
-			}
-
-			newCandidate := sig_graph_grpc.SignatureCandidate{
-				Id:        string(id),
-				Secret:    secret,
-				Signature: signature,
-			}
-			candidates = append(candidates, &newCandidate)
-		}
-	} else {
-		for i := uint32(0); i < s.numberOfCandidate; i++ {
-			draftAsset := &model_sig_graph.Asset{}
-			err = s.cloner.Clone(ctx, asset, draftAsset)
-			if err != nil {
-				return nil, err
-			}
-			draftAsset.UpdatedTime = uint64(requestTime.UnixMilli())
-			id, err := s.idGeneratorService.NewFullId(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			// generate signature for this candidate
+		} else {
 			draftAsset.PublicChildrenIds[string(id)] = true
-			signature, err := s.nodeSigningService.Sign(ctx, ownerKey, &draftAsset)
-			if err != nil {
-				return nil, err
-			}
-
-			newCandidate := sig_graph_grpc.SignatureCandidate{
-				Id:        string(id),
-				Secret:    "",
-				Signature: signature,
-			}
-			candidates = append(candidates, &newCandidate)
 		}
+
+		signature, err = s.nodeSigningService.Sign(ctx, ownerKey, &draftAsset)
+		if err != nil {
+			return nil, err
+		}
+		newCandidate := sig_graph_grpc.SignatureCandidate{
+			Id:        string(id),
+			Secret:    secret,
+			Signature: signature,
+		}
+		candidates = append(candidates, &newCandidate)
 	}
 
 	grpcRequest := sig_graph_grpc.RequestToAcceptAssetRequest{

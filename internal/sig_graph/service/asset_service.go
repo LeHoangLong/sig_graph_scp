@@ -237,6 +237,10 @@ func (s *assetService) TransferAsset(
 	}
 
 	assetStr, err := s.smartContractService.CreateTransaction("TransferAsset", string(requestJson))
+	if err != nil {
+		return
+	}
+
 	err = json.Unmarshal([]byte(assetStr), newAsset)
 	if err != nil {
 		return
