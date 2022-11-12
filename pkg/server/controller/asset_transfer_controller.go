@@ -401,7 +401,7 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 	}
 
 	// save new asset to repository
-	updatedCurrentAsset, newAsset, err := c.updateCurrentAssetAndNewAsset(
+	newAsset, updatedCurrentAsset, err := c.updateCurrentAssetAndNewAsset(
 		ctx,
 		user,
 		assetTransferRequest.NewAsset.Id,

@@ -16,6 +16,13 @@ type Node struct {
 	OwnerPublicKey           string          `json:"owner_public_key"`
 }
 
+func (n *Node) ClearEdges() {
+	n.PublicParentsIds = map[string]bool{}
+	n.PublicChildrenIds = map[string]bool{}
+	n.PrivateParentsHashedIds = map[string]bool{}
+	n.PrivateChildrenHashedIds = map[string]bool{}
+}
+
 func NewDefaultNode(
 	id string,
 	nodeType model.ENodeType,

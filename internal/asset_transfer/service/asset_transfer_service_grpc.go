@@ -226,9 +226,12 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 		OldSecret: "",
 	}
 
-	currentSecret, err := s.secretIdGeneratorI.NewSecretId(ctx)
-	if err != nil {
-		return
+	currentSecret := ""
+	if isNewConnectionSecretOrPublic {
+		currentSecret, err = s.secretIdGeneratorI.NewSecretId(ctx)
+		if err != nil {
+			return
+		}
 	}
 
 	var selectedCandidate *model_asset_transfer.CandidateId

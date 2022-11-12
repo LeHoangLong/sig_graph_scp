@@ -49,8 +49,6 @@ func (m *migratorGorm) Up(ctx context.Context, targetVersion uint32) error {
 				return err
 			}
 
-			fmt.Println("version ", version.Major)
-
 			if version.Major > uint32(i) {
 				return nil
 			}

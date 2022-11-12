@@ -195,6 +195,7 @@ func (s *assetService) TransferAsset(
 	newAsset.CreatedTime = time_ms
 	newAsset.UpdatedTime = time_ms
 	newAsset.CreationProcess = model.ECreationProcessTransfer
+	newAsset.ClearEdges()
 
 	newAsset.OwnerPublicKey = newOwnerKey.Public
 	if currentSecret != "" {
@@ -240,5 +241,6 @@ func (s *assetService) TransferAsset(
 	if err != nil {
 		return
 	}
+
 	return
 }

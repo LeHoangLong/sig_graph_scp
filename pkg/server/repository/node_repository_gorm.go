@@ -4,6 +4,7 @@ import (
 	"context"
 	model_server "sig_graph_scp/pkg/server/model"
 
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -38,7 +39,7 @@ type gormNode struct {
 
 type gormPublicEdge struct {
 	NodeDbId            uint64 `gorm:"primaryKey,priority:1"`
-	Value               string `gorm:"column:other_node_id;primaryKey,prsority:2"`
+	Value               string `gorm:"column:other_node_id;primaryKey,priority:2"`
 	IsThisNodeTheParent bool
 }
 
@@ -106,7 +107,7 @@ func (r *nodeRepositoryGorm) UpsertNode(
 				{Name: "id"},
 			},
 		},
-	).Omit("PrivateChildrenIds").Omit("PrivateParentsIds").Create(&gormNode).Error
+	).Omit(clause.Associations).Create(&gormNode).Error
 	if err != nil {
 		return err
 	}
@@ -174,7 +175,55 @@ func (r *nodeRepositoryGorm) UpsertNode(
 		return err
 	}
 
+	// upsert public edges
+	err = r.upsertPublicEdges(ctx, tx, iNode, &gormNode)
+	if err != nil {
+		return err
+	}
+
 	*iNode = gormNodeToModelNode(&gormNode)
+
+	return nil
+}
+
+func (r *nodeRepositoryGorm) upsertPublicEdges(
+	ctx context.Context,
+	tx *gorm.DB,
+	node *model_server.Node,
+	gormNode *gormNode,
+) error {
+	gormNode.PublicEdges = []gormPublicEdge{}
+	for thisId, _ := range node.PublicParentsIds {
+		id := gormPublicEdge{
+			NodeDbId:            gormNode.ID,
+			IsThisNodeTheParent: false,
+			Value:               thisId,
+		}
+		gormNode.PublicEdges = append(gormNode.PublicEdges, id)
+	}
+
+	for thisId, _ := range node.PublicChildrenIds {
+		id := gormPublicEdge{
+			NodeDbId:            gormNode.ID,
+			IsThisNodeTheParent: true,
+			Value:               thisId,
+		}
+		gormNode.PublicEdges = append(gormNode.PublicEdges, id)
+	}
+
+	if len(gormNode.PublicEdges) != 0 {
+		err := tx.Clauses(
+			clause.OnConflict{
+				Columns: []clause.Column{
+					{Name: "node_db_id"},
+					{Name: "other_node_id"},
+				},
+				UpdateAll: true,
+			},
+		).Create(gormNode.PublicEdges).Error
+
+		return err
+	}
 
 	return nil
 }
