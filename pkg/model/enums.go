@@ -7,7 +7,7 @@ const (
 	ECreationProcessTransfer = "transfer"
 )
 
-type ENodeType string
+type ENodeType = string
 
 const (
 	ENodeTypeAsset ENodeType = "asset"

@@ -35,3 +35,18 @@ func (c *nodeController) UpdateNodeSecretId(
 
 	return c.nodeService.UpdateNodeSecretId(ctx, txId, node, secretIds)
 }
+
+func (c *nodeController) FetchPrivateEdges(
+	ctx context.Context,
+	exposedPrivateConnections map[string]model_server.PrivateId,
+	endNode *model_server.Node,
+	useCache bool,
+) (relatedNodes []any, err error) {
+	txId, err := c.transactionManager.BypassTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer c.transactionManager.StopBypassedTransaction(ctx, txId)
+
+	return c.nodeService.FetchPrivateEdges(ctx, txId, exposedPrivateConnections, endNode, useCache)
+}

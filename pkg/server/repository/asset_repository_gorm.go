@@ -4,6 +4,7 @@ import (
 	"context"
 	"sig_graph_scp/pkg/model"
 	model_server "sig_graph_scp/pkg/server/model"
+	"sig_graph_scp/pkg/utility"
 
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -37,7 +38,7 @@ type gormAsset struct {
 }
 
 func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId TransactionId, iAsset *model_server.Asset) error {
-	iAsset.Node.NodeType = string(model.ENodeTypeAsset)
+	iAsset.Node.NodeType = model.ENodeTypeAsset
 	err := r.nodeRepository.UpsertNode(ctx, transactionId, &iAsset.Node)
 	if err != nil {
 		return err
@@ -114,7 +115,7 @@ func (r *assetRepositoryGorm) FetchAssetsByOwner(
 	nodes, err := r.nodeRepository.FetchNodesByOwnerPublicKey(
 		ctx,
 		transactionId,
-		string(model.ENodeTypeAsset),
+		model.ENodeTypeAsset,
 		namespace,
 		ownerPublicKey,
 		pagination,
@@ -134,7 +135,7 @@ func (r *assetRepositoryGorm) FetchAssetsByIds(ctx context.Context, transactionI
 		return []model_server.Asset{}, err
 	}
 
-	nodes, err := r.nodeRepository.FetchNodesByNodeId(ctx, transactionId, string(model.ENodeTypeAsset), namespace, ids)
+	nodes, err := r.nodeRepository.FetchNodesByNodeId(ctx, transactionId, model.ENodeTypeAsset, namespace, ids)
 	if err != nil {
 		return []model_server.Asset{}, err
 	}
@@ -153,7 +154,7 @@ func (r *assetRepositoryGorm) FetchAssetsByDbIds(ctx context.Context, transactio
 		return []model_server.Asset{}, err
 	}
 
-	nodes, err := r.nodeRepository.FetchNodesByDbId(ctx, transactionId, string(model.ENodeTypeAsset), namespace, ids)
+	nodes, err := r.nodeRepository.FetchNodesByDbId(ctx, transactionId, model.ENodeTypeAsset, namespace, ids)
 	if err != nil {
 		return []model_server.Asset{}, err
 	}
@@ -164,4 +165,50 @@ func (r *assetRepositoryGorm) FetchAssetsByDbIds(ctx context.Context, transactio
 	}
 
 	return ret, nil
+}
+
+func (r *assetRepositoryGorm) FetchNode(
+	ctx context.Context,
+	txId TransactionId,
+	node *model_server.Node,
+) (any, error) {
+	tx, err := r.transactionManagerGorm.GetTransaction(ctx, txId)
+	if err != nil {
+		return model_server.Asset{}, err
+	}
+
+	assets, err := r.fetchAssetsFromNodes(ctx, tx, []model_server.Node{
+		*node,
+	})
+
+	if err != nil {
+		return model_server.Asset{}, err
+	}
+
+	if len(assets) == 0 {
+		return model_server.Asset{}, utility.ErrNotFound
+	}
+
+	return assets[0], nil
+}
+
+func (r *assetRepositoryGorm) UpsertNode(
+	ctx context.Context,
+	txId TransactionId,
+	nodePtr any,
+) (any, error) {
+	if asset, ok := nodePtr.(*model_server.Asset); ok {
+		err := r.SaveAsset(
+			ctx,
+			txId,
+			asset,
+		)
+		if err != nil {
+			return model_server.Asset{}, err
+		}
+
+		return *asset, nil
+	}
+
+	return model_server.Asset{}, utility.ErrInvalidArgument
 }

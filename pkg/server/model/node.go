@@ -22,9 +22,9 @@ type PrivateId struct {
 type Node struct {
 	NodeDbId NodeDbId `json:"db_id"`
 
-	Id        NodeId `json:"id"`
-	Namespace string `json:"-"`
-	NodeType  string `json:"node_type"`
+	Id        NodeId          `json:"id"`
+	Namespace string          `json:"-"`
+	NodeType  model.ENodeType `json:"node_type"`
 
 	PublicParentsIds  map[string]bool `json:"public_parents_ids"`
 	PublicChildrenIds map[string]bool `json:"public_children_ids"`

@@ -2,6 +2,7 @@ package repository_server
 
 import (
 	"context"
+	"sig_graph_scp/pkg/model"
 	model_server "sig_graph_scp/pkg/server/model"
 
 	"gorm.io/gorm"
@@ -69,7 +70,7 @@ func (r *nodeRepositoryGorm) UpsertNode(
 	gormNode := gormNode{
 		NodeID:         string(iNode.Id),
 		Namespace:      iNode.Namespace,
-		NodeType:       iNode.NodeType,
+		NodeType:       string(iNode.NodeType),
 		IsFinalized:    iNode.IsFinalized,
 		CreatedTime:    iNode.CreatedTime,
 		UpdatedTime:    iNode.UpdatedTime,
@@ -251,7 +252,7 @@ func gormNodeToModelNode(node *gormNode) model_server.Node {
 	}
 
 	modelNode := model_server.Node{
-		NodeType:           node.NodeType,
+		NodeType:           model.ENodeType(node.NodeType),
 		NodeDbId:           model_server.NodeDbId(node.ID),
 		Id:                 model_server.NodeId(node.NodeID),
 		Namespace:          node.Namespace,
@@ -271,8 +272,8 @@ func gormNodeToModelNode(node *gormNode) model_server.Node {
 func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(
 	ctx context.Context,
 	transactionId TransactionId,
+	nodeType model.ENodeType,
 	namespace string,
-	nodeType string,
 	ownerPublicKey string,
 	pagination PaginationOption[model_server.NodeDbId],
 ) ([]model_server.Node, error) {
@@ -299,7 +300,7 @@ func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(
 func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 	ctx context.Context,
 	transactionId TransactionId,
-	nodeType string,
+	nodeType model.ENodeType,
 	namespace string,
 	iIds map[model_server.NodeId]bool,
 ) ([]model_server.Node, error) {
@@ -330,7 +331,7 @@ func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 func (r *nodeRepositoryGorm) FetchNodesByDbId(
 	ctx context.Context,
 	transactionId TransactionId,
-	nodeType string,
+	nodeType model.ENodeType,
 	namespace string,
 	iIds map[model_server.NodeDbId]bool,
 ) ([]model_server.Node, error) {

@@ -8,6 +8,7 @@ import (
 	"sig_graph_scp/cmd/middleware"
 	"sig_graph_scp/cmd/view"
 	api_asset_transfer "sig_graph_scp/pkg/asset_transfer/api"
+	"sig_graph_scp/pkg/model"
 	controller_server "sig_graph_scp/pkg/server/controller"
 	repository_server "sig_graph_scp/pkg/server/repository"
 	service_server "sig_graph_scp/pkg/server/service"
@@ -25,14 +26,14 @@ func main() {
 	eventBus := EventBus.New()
 
 	// sig graph api
-	assetApi, err := api_sig_graph.NewAssetClientApi("sgp://hyper:[http://localhost:7051,http://localhost:9051]:public")
+	sigGraphApi, err := api_sig_graph.NewAssetClientApi("sgp://hyper:[http://localhost:7051,http://localhost:9051]:public")
 	if err != nil {
 		panic(fmt.Sprintf("could not create asset client api: %s", err))
 	}
 
 	// asset transfer api
 	assetTransferApi, err := api_asset_transfer.NewAssetTransferServiceApi(
-		assetApi,
+		sigGraphApi,
 		&api_asset_transfer.Options{
 			NumberOfCandidates: 6,
 		},
@@ -110,11 +111,17 @@ func main() {
 	assetTransferRepository := repository_server.NewAssetTransferRepositoryGorm(*transactionManager)
 
 	// service
-	nodeService := service_server.NewNodeService(nodeRepository)
+	nodeService := service_server.NewNodeService(
+		nodeRepository,
+		map[model.ENodeType]repository_server.GenericNodeRepositoryI{
+			model.ENodeTypeAsset: assetRepository,
+		},
+		sigGraphApi,
+	)
 
 	// controller
 	nodeController := controller_server.NewNodeController(nodeService, transactionManager)
-	assetController := controller_server.NewAssetController(assetApi, assetRepository, userKeyPairRepository, transactionManager, hashedIdGenerator)
+	assetController := controller_server.NewAssetController(sigGraphApi, assetRepository, userKeyPairRepository, transactionManager, hashedIdGenerator)
 	userKeyPairController := controller_server.NewUserKeyPairController(userKeyPairRepository, transactionManager)
 	peerController := controller_server.NewPeerController(transactionManager, peerRepository)
 	assetTransferController := controller_server.NewAssetTransferController(

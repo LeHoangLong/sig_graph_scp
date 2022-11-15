@@ -271,6 +271,13 @@ func (c *assetTransferController) newAcceptAssetRequestReceivedHandler(
 	if err != nil {
 		return
 	}
+
+	c.nodeController.FetchPrivateEdges(
+		ctx,
+		exposedPrivateConnections,
+		&asset.Node,
+		true,
+	)
 }
 
 func (c *assetTransferController) GetRequestsToAcceptAsset(

@@ -36,6 +36,9 @@ type SigGraphClientApi interface {
 		currentSignature string,
 	) (updatedCurrentAsset *model_sig_graph.Asset, newAsset *model_sig_graph.Asset, err error)
 	GetGraphName() string
+
+	// return NotFound if any one id is not found
+	FetchNodesByIds(ctx context.Context, ids map[string]bool) (map[string]any, error)
 }
 
 type sigGraphClientApi struct {
@@ -78,6 +81,10 @@ func (a *sigGraphClientApi) GetGraphName() string {
 
 func (a *sigGraphClientApi) DoNodeIdsExists(ctx context.Context, ids map[string]bool) (map[string]bool, error) {
 	return a.nodeService.DoNodeIdsExists(ctx, ids)
+}
+
+func (a *sigGraphClientApi) FetchNodesByIds(ctx context.Context, ids map[string]bool) (map[string]any, error) {
+	return a.nodeService.FetchNodesByIds(ctx, ids)
 }
 
 func (a *sigGraphClientApi) CreateAsset(

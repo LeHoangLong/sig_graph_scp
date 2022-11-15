@@ -2,6 +2,7 @@ package repository_server
 
 import (
 	"context"
+	"sig_graph_scp/pkg/model"
 	model_server "sig_graph_scp/pkg/server/model"
 )
 
@@ -9,6 +10,8 @@ type EdgeNodeId struct {
 	Parent model_server.NodeId
 	Child  model_server.NodeId
 }
+
+const ENodeTypeAny model.ENodeType = "any"
 
 // TODO: Add method to remove edge
 //
@@ -27,8 +30,8 @@ type NodeRepositoryI interface {
 	// edge. You must use other methods if you want to delete an existing
 	// edge.
 	UpsertNode(ctx context.Context, transactionId TransactionId, iNode *model_server.Node) error
-	FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, ownerPublicKey string, pagination PaginationOption[model_server.NodeDbId]) ([]model_server.Node, error)
-	FetchNodesByNodeId(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, id map[model_server.NodeId]bool) ([]model_server.Node, error)
-	FetchNodesByDbId(ctx context.Context, transactionId TransactionId, nodeType string, namespace string, id map[model_server.NodeDbId]bool) ([]model_server.Node, error)
+	FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType model.ENodeType, namespace string, ownerPublicKey string, pagination PaginationOption[model_server.NodeDbId]) ([]model_server.Node, error)
+	FetchNodesByNodeId(ctx context.Context, transactionId TransactionId, nodeType model.ENodeType, namespace string, id map[model_server.NodeId]bool) ([]model_server.Node, error)
+	FetchNodesByDbId(ctx context.Context, transactionId TransactionId, nodeType model.ENodeType, namespace string, id map[model_server.NodeDbId]bool) ([]model_server.Node, error)
 	FetchPrivateEdgesByNodeIds(ctx context.Context, transactionId TransactionId, namespace string, edges []EdgeNodeId) ([]model_server.PrivateId, error)
 }

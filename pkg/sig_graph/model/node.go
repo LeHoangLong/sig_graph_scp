@@ -3,17 +3,17 @@ package model_sig_graph
 import "sig_graph_scp/pkg/model"
 
 type Node struct {
-	Id                       string          `json:"id"`
-	PublicParentsIds         map[string]bool `json:"public_parents_ids"`
-	PublicChildrenIds        map[string]bool `json:"public_children_ids"`
-	PrivateParentsHashedIds  map[string]bool `json:"private_parents_hashed_ids"`
-	PrivateChildrenHashedIds map[string]bool `json:"private_children_hashed_ids"`
-	IsFinalized              bool            `json:"is_finalized"`
-	NodeType                 model.ENodeType `json:"type"`
-	CreatedTime              uint64          `json:"created_time"`
-	UpdatedTime              uint64          `json:"updated_time"`
-	Signature                string          `json:"signature"`
-	OwnerPublicKey           string          `json:"owner_public_key"`
+	Id                       string          `json:"id" mapstructure:"id"`
+	PublicParentsIds         map[string]bool `json:"public_parents_ids" mapstructure:"public_parents_ids"`
+	PublicChildrenIds        map[string]bool `json:"public_children_ids" mapstructure:"public_children_ids"`
+	PrivateParentsHashedIds  map[string]bool `json:"private_parents_hashed_ids" mapstructure:"private_parents_hashed_ids"`
+	PrivateChildrenHashedIds map[string]bool `json:"private_children_hashed_ids" mapstructure:"private_children_hashed_ids"`
+	IsFinalized              bool            `json:"is_finalized" mapstructure:"is_finalized"`
+	NodeType                 model.ENodeType `json:"type" mapstructure:"type"`
+	CreatedTime              uint64          `json:"created_time" mapstructure:"created_time"`
+	UpdatedTime              uint64          `json:"updated_time" mapstructure:"updated_time"`
+	Signature                string          `json:"signature" mapstructure:"signature"`
+	OwnerPublicKey           string          `json:"owner_public_key" mapstructure:"owner_public_key"`
 }
 
 func (n *Node) ClearEdges() {

@@ -2,6 +2,7 @@ package service_sig_graph
 
 import (
 	"crypto/x509"
+	"fmt"
 	utility_sig_graph "sig_graph_scp/internal/sig_graph/utility"
 	"sig_graph_scp/pkg/utility"
 	"strings"
@@ -89,14 +90,19 @@ func (s *smartContractServiceHyperledger) Close() {
 	s.clientConnection.Close()
 }
 
-func wrapError(err error) error {
+func wrapError(functionName string, err error) error {
 	statusErr := status.Convert(err)
+	smartContractErr := fmt.Errorf("%w for function %s", utility.ErrSmartContractError, functionName)
 	for _, detail := range statusErr.Details() {
 		switch detail := detail.(type) {
 		case *gateway.ErrorDetail:
 			if strings.Contains(detail.Message, "not found") {
 				err = multierr.Append(err, utility.ErrNotFound)
+			} else {
+				err = fmt.Errorf("%s", detail.Message)
 			}
+
+			err = multierr.Append(smartContractErr, err)
 		}
 	}
 	return err
@@ -106,9 +112,10 @@ func (s *smartContractServiceHyperledger) CreateTransaction(
 	functionName string,
 	args ...string,
 ) (string, error) {
+	fmt.Println("args ", args)
 	result, err := s.contract.SubmitTransaction(functionName, args...)
 	if err != nil {
-		return "", wrapError(err)
+		return "", wrapError(functionName, err)
 	}
 
 	return string(result), nil
@@ -120,7 +127,7 @@ func (s *smartContractServiceHyperledger) Query(
 ) (string, error) {
 	result, err := s.contract.EvaluateTransaction(functionName, args...)
 	if err != nil {
-		return "", wrapError(err)
+		return "", wrapError(functionName, err)
 	}
 
 	return string(result), nil
