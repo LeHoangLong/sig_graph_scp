@@ -1,3 +1,20 @@
+CREATE TABLE IF NOT EXISTS gorm_users (
+    id BIGSERIAL PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS gorm_usernames (
+    user_id BIGINT PRIMARY KEY REFERENCES gorm_users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    username VARCHAR(1024) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS gorm_user_credentials (
+    user_id BIGINT REFERENCES gorm_users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    credential_name VARCHAR(1024) NOT NULL,
+    credential_value VARCHAR(1024) NOT NULL,
+    PRIMARY KEY(user_id, credential_name)
+);
+
+
 CREATE TABLE IF NOT EXISTS gorm_nodes (
     id BIGSERIAL PRIMARY KEY,
     node_id VARCHAR(1024) NOT NULL,
@@ -43,7 +60,7 @@ CREATE TABLE IF NOT EXISTS gorm_assets (
 
 CREATE TABLE IF NOT EXISTS gorm_user_key_pairs (
     id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL REFERENCES gorm_users(id) ON UPDATE CASCADE ON DELETE CASCADE,
     public_key  VARCHAR(4096) NOT NULL UNIQUE,
     private_key  VARCHAR(4096) NOT NULL
 );

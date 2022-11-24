@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS gorm_peer_protocols (
 
 CREATE TABLE IF NOT EXISTS gorm_peers (
     id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL REFERENCES gorm_users(id) ON UPDATE CASCADE ON DELETE CASCADE,
     connection_uri VARCHAR(4096) NOT NULL,
     peer_pem_public_key VARCHAR(4096) NOT NULL,
     protocol_id INTEGER REFERENCES gorm_peer_protocols(id) ON DELETE RESTRICT ON UPDATE CASCADE

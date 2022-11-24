@@ -22,6 +22,8 @@ import (
 )
 
 func main() {
+	// gin.SetMode(gin.ReleaseMode)
+
 	// event bus
 	eventBus := EventBus.New()
 
@@ -109,6 +111,7 @@ func main() {
 	userKeyPairRepository := repository_server.NewUserKeyRepositoryGorm(transactionManager)
 	peerRepository := repository_server.NewPeerRepositoryGorm(transactionManager)
 	assetTransferRepository := repository_server.NewAssetTransferRepositoryGorm(*transactionManager)
+	userRepository := repository_server.NewUserRepositoryGorm(transactionManager)
 
 	// service
 	nodeService := service_server.NewNodeService(
@@ -137,6 +140,10 @@ func main() {
 		assetController,
 		assetTransferRepository,
 	)
+	userController := controller_server.NewUserController(
+		userRepository,
+		transactionManager,
+	)
 
 	{
 		ctx := context.Background()
@@ -152,18 +159,27 @@ func main() {
 		)
 	}
 
+	// middleware
+	auth := middleware.NewAuthenticatorSimple(
+		3600*24*365,
+		"api.dev.com",
+	)
+
 	// view
 	assetView := view.NewAssetView(assetController)
 	userKeyPairView := view.NewUserKeyPairView(userKeyPairController)
 	peerView := view.NewPeerView(peerController)
 	assetTransferView := view.NewAssetTransferView(assetTransferController)
-
-	//authenticator
-	auth := middleware.NewAuthenticatorSimple()
+	userView := view.NewUserView(userController, auth, auth)
 
 	// api
-	api := router.Group("/api")
+	api := router.Group("")
 	{
+		// user
+		api.POST("/logins", userView.LogIn)
+		api.POST("/users", userView.SignUp)
+		api.DELETE("/logins", userView.LogOut)
+
 		// asset
 		api.GET("/assets", auth.Authenticate, assetView.GetAssetById)
 		api.POST("/assets", auth.Authenticate, assetView.CreateAsset)

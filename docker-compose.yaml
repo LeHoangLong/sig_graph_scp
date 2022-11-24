@@ -15,7 +15,7 @@ services:
       - PEM_CERTIFICATE_PATH=/root/server/dev/keystore/Org1/cert.pem
       - PEM_SECRET_KEY_PATH=/root/server/dev/keystore/Org1/private.pem
       - SERVER_ADDRESS=:8000
-      - DB_CONNECTION=postgresql://user:password@localhost/db?connect_timeout=10
+      - DB_CONNECTION=postgresql://user:password@localhost/db?connect_timeout=10&sslmode=disable
       - GATEWAY_PEER=peer0.org1.example.com
       - TLS_PEM_CERTIFICATE_PATH=/root/server/dev/keystore/Org1/ca.crt
   ca:
@@ -34,4 +34,9 @@ services:
       - POSTGRES_USER=user
       - POSTGRES_DB=db
     network_mode: host
-      
+  proxy:
+    image: haproxy:2.6.6
+    volumes:
+      - ./haproxy:/usr/local/etc/haproxy
+    network_mode: host
+    user: root

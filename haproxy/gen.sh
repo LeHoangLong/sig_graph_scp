@@ -1,0 +1,1 @@
+ openssl req -nodes -x509 -newkey rsa:4096 -keyout dev.key -out dev.crt -days 3650 -addext "subjectAltName = DNS:dev.com, DNS:api.dev.com"

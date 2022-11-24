@@ -194,7 +194,7 @@ func (r *nodeRepositoryGorm) upsertPublicEdges(
 	gormNode *gormNode,
 ) error {
 	gormNode.PublicEdges = []gormPublicEdge{}
-	for thisId, _ := range node.PublicParentsIds {
+	for thisId := range node.PublicParentsIds {
 		id := gormPublicEdge{
 			NodeDbId:            gormNode.ID,
 			IsThisNodeTheParent: false,
@@ -203,7 +203,7 @@ func (r *nodeRepositoryGorm) upsertPublicEdges(
 		gormNode.PublicEdges = append(gormNode.PublicEdges, id)
 	}
 
-	for thisId, _ := range node.PublicChildrenIds {
+	for thisId := range node.PublicChildrenIds {
 		id := gormPublicEdge{
 			NodeDbId:            gormNode.ID,
 			IsThisNodeTheParent: true,
