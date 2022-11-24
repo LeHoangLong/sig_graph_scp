@@ -58,7 +58,7 @@ func (v *assetView) CreateAsset(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, asset)
+	c.JSON(http.StatusCreated, asset)
 	return
 }
 

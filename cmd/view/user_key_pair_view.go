@@ -63,7 +63,6 @@ func (v *userKeyPairView) AddUserKeyPairToUser(c *gin.Context) {
 	user := middleware.GetUser(c.Request.Context())
 	request := AddUserKeyPairToUserRequest{}
 	if err := c.ShouldBind(&request); err != nil {
-		fmt.Println("bind err ", err)
 		utility.AbortBadRequest(c, err)
 		return
 	}
@@ -116,6 +115,6 @@ func (v *userKeyPairView) AddUserKeyPairToUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, "")
+	c.JSON(http.StatusCreated, "")
 	return
 }

@@ -65,7 +65,7 @@ func (v *assetTransferView) CreateRequestToAcceptAsset(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, requestToAcceptAsset)
+	c.JSON(http.StatusCreated, requestToAcceptAsset)
 	return
 }
 

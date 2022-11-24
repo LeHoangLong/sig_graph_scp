@@ -100,6 +100,6 @@ func (v *peerView) CreatePeer(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, peer)
+	c.JSON(http.StatusCreated, peer)
 	return
 }

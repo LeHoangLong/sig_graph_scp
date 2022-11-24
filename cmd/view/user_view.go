@@ -88,7 +88,7 @@ func (v *userView) SignUp(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusCreated, user)
 	return
 }
 
