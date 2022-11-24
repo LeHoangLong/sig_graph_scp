@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sig_graph_scp/cmd/utility"
 	model_server "sig_graph_scp/pkg/server/model"
 
 	"github.com/gin-gonic/gin"
@@ -29,7 +28,7 @@ func NewAuthenticatorSimple(
 const userCookieName = "user"
 
 func (a *authenticatorSimple) Authenticate(c *gin.Context) {
-	userCookie, err := c.Request.Cookie(utility.UserCookieName)
+	userCookie, err := c.Request.Cookie(userCookieName)
 	if err != nil {
 		c.AbortWithError(http.StatusForbidden, fmt.Errorf("login cookie not found"))
 		return
