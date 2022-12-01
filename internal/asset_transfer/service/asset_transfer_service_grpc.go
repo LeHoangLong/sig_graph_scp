@@ -174,6 +174,7 @@ func (s *assetTransferServiceGrpc) TransferAsset(
 			ExposedPrivateConnections: exposedPrivateConnections,
 			Candidates:                tempCandidates,
 		}
+
 		return &modelRequest, err
 	}
 }

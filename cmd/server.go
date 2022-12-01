@@ -196,6 +196,7 @@ func main() {
 		// asset transfer
 		api.POST("/asset_accept_requests", auth.Authenticate, assetTransferView.CreateRequestToAcceptAsset)
 		api.GET("/asset_accept_requests", auth.Authenticate, assetTransferView.GetReceivedRequestToAcceptAsset)
+		api.GET("/asset_accept_requests/private_edges", auth.Authenticate, assetTransferView.GetPrivateEdges)
 
 		// accept asset transfer
 		api.POST("/asset_accept_requests/acceptance", auth.Authenticate, assetTransferView.AcceptReceivedRequestToAcceptAsset)

@@ -197,17 +197,23 @@ func (r *assetRepositoryGorm) UpsertNode(
 	txId TransactionId,
 	nodePtr any,
 ) (any, error) {
-	if asset, ok := nodePtr.(*model_server.Asset); ok {
+	var ptr *any
+	var ok bool
+	if ptr, ok = nodePtr.(*any); !ok {
+		return model_server.Asset{}, utility.ErrInvalidArgument
+	}
+
+	if asset, ok := (*ptr).(model_server.Asset); ok {
 		err := r.SaveAsset(
 			ctx,
 			txId,
-			asset,
+			&asset,
 		)
 		if err != nil {
 			return model_server.Asset{}, err
 		}
 
-		return *asset, nil
+		return asset, nil
 	}
 
 	return model_server.Asset{}, utility.ErrInvalidArgument

@@ -36,6 +36,12 @@ type AssetTransferControllerI interface {
 		toInformSenderOfNewId bool,
 	) (*model_server.RequestToAcceptAsset, error)
 
+	FetchPrivateEdges(
+		ctx context.Context,
+		user *model_server.User,
+		requestId model_server.RequestId,
+	) ([]any, error)
+
 	/*
 
 		GetSentRequestsToAcceptAsset(

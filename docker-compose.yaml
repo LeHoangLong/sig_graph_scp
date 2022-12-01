@@ -18,6 +18,7 @@ services:
       - DB_CONNECTION=postgresql://user:password@localhost/db?connect_timeout=10&sslmode=disable
       - GATEWAY_PEER=peer0.org1.example.com
       - TLS_PEM_CERTIFICATE_PATH=/root/server/dev/keystore/Org1/ca.crt
+      - ASSET_TRANSFER_SERVER_GRPC_ADDRESS=localhost:5000
   ca:
     image: hyperledger/fabric-ca
     volumes:

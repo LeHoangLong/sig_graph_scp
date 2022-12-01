@@ -48,9 +48,14 @@ type sigGraphClientApi struct {
 }
 
 func NewAssetClientApi(graphName string) (SigGraphClientApi, error) {
-	smartContractService, err := service_sig_graph.NewSmartContractServiceHyperledger()
+	assetSmartContractService, err := service_sig_graph.NewAssetSmartContractServiceHyperledger()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize smart contract service: %w", err)
+		return nil, fmt.Errorf("failed to initialize asset smart contract service: %w", err)
+	}
+
+	nodeSmartContractService, err := service_sig_graph.NewNodeSmartContractServiceHyperledger()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize node smart contract service: %w", err)
 	}
 
 	nodeSigningService := service_sig_graph.NewNodeSigningService()
@@ -59,9 +64,9 @@ func NewAssetClientApi(graphName string) (SigGraphClientApi, error) {
 	hashGenerator := utility.NewHashedIdGeneratorService()
 	cloner := utility.NewCloner()
 
-	nodeSigGraphService := service_sig_graph.NewNodeService(smartContractService)
+	nodeSigGraphService := service_sig_graph.NewNodeService(nodeSmartContractService)
 	assetSigGraphService := service_sig_graph.NewAssetService(
-		smartContractService,
+		assetSmartContractService,
 		clockWall,
 		idGeneratorService,
 		nodeSigningService,

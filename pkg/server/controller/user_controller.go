@@ -2,7 +2,6 @@ package controller_server
 
 import (
 	"context"
-	"fmt"
 	model_server "sig_graph_scp/pkg/server/model"
 	repository_server "sig_graph_scp/pkg/server/repository"
 
@@ -51,7 +50,6 @@ func (c *userController) CreateUserWithUsernameAndPassword(
 		},
 	)
 	if err != nil {
-		fmt.Println("err: ", err)
 		return model_server.User{}, err
 	}
 

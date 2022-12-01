@@ -23,6 +23,7 @@ type NodeServiceI interface {
 	FetchPrivateEdges(
 		ctx context.Context,
 		txId repository_server.TransactionId,
+		user *model_server.User,
 		exposedPrivateConnections map[string]model_server.PrivateId,
 		endNode *model_server.Node,
 		useCache bool,
@@ -45,8 +46,9 @@ func NewNodeService(
 	sigGraphApi api_sig_graph.SigGraphClientApi,
 ) *nodeService {
 	return &nodeService{
-		nodeRepository: nodeRepository,
-		sigGraphApi:    sigGraphApi,
+		nodeRepository:        nodeRepository,
+		sigGraphApi:           sigGraphApi,
+		genericNodeRepository: genericNodeRepository,
 	}
 }
 
@@ -85,11 +87,23 @@ func (s *nodeService) UpdateNodeSecretId(
 func (s *nodeService) FetchPrivateEdges(
 	ctx context.Context,
 	txId repository_server.TransactionId,
+	user *model_server.User,
 	exposedPrivateConnections map[string]model_server.PrivateId,
 	endNode *model_server.Node,
 	useCache bool,
 ) ([]any, error) {
+	reversedIds := map[string]model_server.PrivateId{}
 	relatedNodesMap := map[model_server.NodeId]any{}
+	// reverse the exposed connections so that we also fetch them
+	for _, privateId := range exposedPrivateConnections {
+		reversedId := model_server.ReversePrivateId(&privateId)
+		reversedIds[reversedId.ThisHash] = reversedId
+	}
+
+	for hash := range reversedIds {
+		exposedPrivateConnections[hash] = reversedIds[hash]
+	}
+
 	err := s.fetchPrivateEdges(
 		ctx,
 		txId,
@@ -103,11 +117,26 @@ func (s *nodeService) FetchPrivateEdges(
 		return nil, err
 	}
 
-	ret := []any{}
+	relatedNodesMapWithStringKey := map[string]any{}
 	for id := range relatedNodesMap {
-		ret = append(ret, relatedNodesMap[id])
+		relatedNodesMapWithStringKey[string(id)] = relatedNodesMap[id]
 	}
 
+	namespace := fmt.Sprintf("%d", user.ID)
+	savedNodes, err := s.saveGenericModel(
+		ctx,
+		txId,
+		namespace,
+		relatedNodesMapWithStringKey,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := []any{}
+	for id := range savedNodes {
+		ret = append(ret, savedNodes[id])
+	}
 	return ret, nil
 }
 
@@ -168,7 +197,7 @@ func (s *nodeService) fetchNodesByIds(
 		return nil, err
 	}
 
-	ret, err := s.saveGenericSigGraphNodeAndConvertToModel(
+	savedNodes, err := s.saveGenericSigGraphNodeAndConvertToModel(
 		ctx,
 		txId,
 		namespace,
@@ -178,8 +207,9 @@ func (s *nodeService) fetchNodesByIds(
 		return nil, err
 	}
 
-	for id := range cachedNodes {
-		ret[id] = cachedNodes[id]
+	ret := cachedNodes
+	for id := range savedNodes {
+		ret[id] = savedNodes[id]
 	}
 
 	return ret, nil
@@ -218,6 +248,34 @@ func (s *nodeService) fetchCachedNodes(
 	return cachedNodes, nil
 }
 
+func (s *nodeService) saveGenericModel(
+	ctx context.Context,
+	txId repository_server.TransactionId,
+	namespace string,
+	modelNodes map[string]any,
+) (map[model_server.NodeId]any, error) {
+	savedNodes := map[model_server.NodeId]any{}
+	for id := range modelNodes {
+		_, nodeType, err := s.extractServerNode(modelNodes[id])
+		if err != nil {
+			return nil, err
+		}
+		modelNode := modelNodes[id]
+
+		savedNode, err := s.genericNodeRepository[nodeType].UpsertNode(
+			ctx,
+			txId,
+			&modelNode,
+		)
+		if err != nil {
+			return nil, err
+		}
+		savedNodes[model_server.NodeId(id)] = savedNode
+	}
+
+	return savedNodes, nil
+}
+
 func (s *nodeService) saveGenericSigGraphNodeAndConvertToModel(
 	ctx context.Context,
 	txId repository_server.TransactionId,
@@ -226,14 +284,7 @@ func (s *nodeService) saveGenericSigGraphNodeAndConvertToModel(
 ) (map[model_server.NodeId]any, error) {
 	savedNodes := map[model_server.NodeId]any{}
 	for id := range sigGraphNodes {
-		var sigGraphNode model_sig_graph.Node
-		var ok bool
-		if sigGraphNode, ok = sigGraphNodes[id].(model_sig_graph.Node); !ok {
-			return nil, utility.ErrInvalidState
-		}
-
-		nodeType := sigGraphNode.NodeType
-		parsedNode, err := s.parseSigGraphNode(sigGraphNode, namespace)
+		parsedNode, nodeType, err := s.parseSigGraphNodeToServerNode(sigGraphNodes[id], namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -243,6 +294,9 @@ func (s *nodeService) saveGenericSigGraphNodeAndConvertToModel(
 			txId,
 			&parsedNode,
 		)
+		if err != nil {
+			return nil, err
+		}
 		savedNodes[model_server.NodeId(id)] = parsedNode
 	}
 
@@ -281,63 +335,111 @@ func (s *nodeService) fetchPrivateEdges(
 	}
 
 	for id := range newlyFetchedNodes {
-		if node, ok := newlyFetchedNodes[id].(model_server.Node); !ok {
-			return utility.ErrInvalidState
-		} else {
-			err = s.fetchPrivateEdges(
-				ctx,
-				txId,
-				namespace,
-				exposedPrivateConnections,
-				&node,
-				fetchedNodes,
-				useCache,
-			)
-			if err != nil {
-				return err
+		node, _, err := s.extractServerNode(newlyFetchedNodes[id])
+		if err != nil {
+			return err
+		}
+
+		for hash := range exposedPrivateConnections {
+			exposedPrivateId := exposedPrivateConnections[hash]
+			otherHash := exposedPrivateConnections[hash].OtherHash
+			if _, ok := node.PrivateParentsIds[otherHash]; ok {
+				node.PrivateParentsIds[otherHash] = model_server.ReversePrivateId(&exposedPrivateId)
 			}
+
+			thisHash := exposedPrivateConnections[hash].ThisHash
+			if _, ok := node.PrivateParentsIds[thisHash]; ok {
+				node.PrivateParentsIds[thisHash] = exposedPrivateId
+			}
+		}
+
+		for hash := range exposedPrivateConnections {
+			exposedPrivateId := exposedPrivateConnections[hash]
+			otherHash := exposedPrivateConnections[hash].OtherHash
+			if _, ok := node.PrivateChildrenIds[otherHash]; ok {
+				node.PrivateChildrenIds[otherHash] = model_server.ReversePrivateId(&exposedPrivateId)
+			}
+
+			thisHash := exposedPrivateConnections[hash].ThisHash
+			if _, ok := node.PrivateChildrenIds[thisHash]; ok {
+				node.PrivateChildrenIds[thisHash] = exposedPrivateId
+			}
+		}
+
+		err = s.fetchPrivateEdges(
+			ctx,
+			txId,
+			namespace,
+			exposedPrivateConnections,
+			&node,
+			fetchedNodes,
+			useCache,
+		)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
+func (s *nodeService) extractServerNode(iNode any) (extractedNode model_server.Node, nodeType model.ENodeType, err error) {
+	if node, ok := iNode.(model_server.Node); ok {
+		return node, model.ENodeTypeNode, nil
+	} else if node, ok := iNode.(model_server.Asset); ok {
+		return node.Node, model.ENodeTypeAsset, nil
+	} else {
+		return model_server.Node{}, "", utility.ErrInvalidArgument
+	}
+}
+
+func (s *nodeService) extractSigGraphNode(iNode any) (extractedNode model_sig_graph.Node, err error) {
+	if node, ok := iNode.(model_sig_graph.Node); ok {
+		return node, nil
+	} else if node, ok := iNode.(model_sig_graph.Asset); ok {
+		return node.Node, nil
+	} else {
+		return model_sig_graph.Node{}, utility.ErrInvalidArgument
+	}
+}
+
 // create model_server structs from model_sig_graph structs
 // fields that cannot be filled will be filled with default values
-func (s *nodeService) parseSigGraphNode(iNode any, namspace string) (any, error) {
-	if node, ok := iNode.(model_sig_graph.Node); !ok {
-		return model_server.Node{}, utility.ErrInvalidArgument
-	} else {
-		privateParentIds := map[string]model_server.PrivateId{}
-		for hash := range node.PrivateParentsHashedIds {
-			privateParentIds[hash] = model_server.PrivateId{}
-		}
+func (s *nodeService) parseSigGraphNodeToServerNode(iNode any, namspace string) (modelServerNode any, nodeType model.ENodeType, err error) {
+	extractedNode, err := s.extractSigGraphNode(iNode)
+	if err != nil {
+		return nil, "", err
+	}
 
-		privateChildrenIds := map[string]model_server.PrivateId{}
-		for hash := range node.PrivateChildrenHashedIds {
-			privateChildrenIds[hash] = model_server.PrivateId{}
-		}
-		modelNode := model_server.FromSigGraphNode(
-			&node,
-			0,
-			namspace,
-			privateParentIds,
-			privateChildrenIds,
-		)
+	privateParentIds := map[string]model_server.PrivateId{}
+	for hash := range extractedNode.PrivateParentsHashedIds {
+		privateParentIds[hash] = model_server.PrivateId{}
+	}
 
-		switch node.NodeType {
-		case model.ENodeTypeAsset:
-			if asset, ok := iNode.(model_sig_graph.Asset); !ok {
-				return model_server.Node{}, utility.ErrInvalidArgument
-			} else {
-				modelAsset := model_server.FromSigGraphAsset(
-					&asset,
-					&modelNode,
-				)
-				return modelAsset, nil
-			}
-		default:
-			return model_server.Node{}, utility.ErrInvalidArgument
+	privateChildrenIds := map[string]model_server.PrivateId{}
+	for hash := range extractedNode.PrivateChildrenHashedIds {
+		privateChildrenIds[hash] = model_server.PrivateId{}
+	}
+	modelNode := model_server.FromSigGraphNode(
+		&extractedNode,
+		0,
+		namspace,
+		privateParentIds,
+		privateChildrenIds,
+	)
+
+	switch extractedNode.NodeType {
+	case model.ENodeTypeAsset:
+		if asset, ok := iNode.(model_sig_graph.Asset); !ok {
+			return model_server.Node{}, "", utility.ErrInvalidArgument
+		} else {
+			modelAsset := model_server.FromSigGraphAsset(
+				&asset,
+				&modelNode,
+			)
+			return modelAsset, model.ENodeTypeAsset, nil
 		}
+	default:
+		return model_server.Node{}, "", utility.ErrInvalidArgument
 	}
 }
 

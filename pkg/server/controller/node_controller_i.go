@@ -14,6 +14,7 @@ type NodeControllerI interface {
 
 	FetchPrivateEdges(
 		ctx context.Context,
+		user *model_server.User,
 		exposedPrivateConnections map[string]model_server.PrivateId,
 		endNode *model_server.Node,
 		useCache bool,

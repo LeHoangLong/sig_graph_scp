@@ -145,3 +145,31 @@ func (v *assetTransferView) AcceptReceivedRequestToAcceptAsset(c *gin.Context) {
 	c.JSON(http.StatusOK, requestToAcceptAsset)
 	return
 }
+
+type GetPrivateEdgesRequest struct {
+	RequestId uint64 `form:"request_id"`
+}
+
+func (v *assetTransferView) GetPrivateEdges(c *gin.Context) {
+	ctx := c.Request.Context()
+	user := middleware.GetUser(c.Request.Context())
+
+	request := GetPrivateEdgesRequest{}
+	if err := c.ShouldBind(&request); err != nil {
+		utility.AbortBadRequest(c, err)
+		return
+	}
+
+	relatedNodes, err := v.controller.FetchPrivateEdges(
+		ctx,
+		user,
+		model_server.RequestId(request.RequestId),
+	)
+	if err != nil {
+		utility.AbortWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, relatedNodes)
+	return
+}

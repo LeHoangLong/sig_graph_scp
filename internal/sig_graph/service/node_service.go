@@ -3,6 +3,7 @@ package service_sig_graph
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sig_graph_scp/pkg/model"
 	model_sig_graph "sig_graph_scp/pkg/sig_graph/model"
 	"sig_graph_scp/pkg/utility"
@@ -27,7 +28,7 @@ func (s *nodeService) DoNodeIdsExists(
 		return nil, err
 	}
 
-	data, err := s.smartContractService.Query("DoNodeIdsExists", string(idsJson))
+	data, err := s.smartContractService.Query("DoNodeIdsExist", string(idsJson))
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +98,7 @@ func (s *nodeService) parseNodeType(
 				return nil, err
 			}
 
+			fmt.Printf("asset: %+v\n", asset)
 			ret[id] = asset
 		default:
 			return nil, utility.ErrInvalidState

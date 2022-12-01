@@ -51,7 +51,7 @@ func newSign() identity.Sign {
 	return sign
 }
 
-func NewSmartContractServiceHyperledger() (SmartContractServiceI, error) {
+func NewAssetSmartContractServiceHyperledger() (SmartContractServiceI, error) {
 	settings := utility_sig_graph.GetGlobalSettings()
 
 	certificate := settings.IdentityX509Certificate()
@@ -76,7 +76,42 @@ func NewSmartContractServiceHyperledger() (SmartContractServiceI, error) {
 	)
 
 	network := gateway.GetNetwork(settings.ChannelName())
-	contract := network.GetContract(settings.ContractName())
+	contract := network.GetContractWithName(settings.ContractName(), "assetView")
+
+	service := smartContractServiceHyperledger{
+		contract: contract,
+	}
+	service.clientConnection = clientConnection
+
+	return &service, nil
+}
+
+func NewNodeSmartContractServiceHyperledger() (SmartContractServiceI, error) {
+	settings := utility_sig_graph.GetGlobalSettings()
+
+	certificate := settings.IdentityX509Certificate()
+
+	clientConnection, err := newGrpcConnection()
+	if err != nil {
+		return nil, err
+	}
+
+	mspId := settings.MspId()
+
+	id, err := identity.NewX509Identity(mspId, certificate)
+	if err != nil {
+		clientConnection.Close()
+		return nil, err
+	}
+
+	gateway, err := client.Connect(
+		id,
+		client.WithSign(newSign()),
+		client.WithClientConnection(clientConnection),
+	)
+
+	network := gateway.GetNetwork(settings.ChannelName())
+	contract := network.GetContractWithName(settings.ContractName(), "nodeView")
 
 	service := smartContractServiceHyperledger{
 		contract: contract,
@@ -112,7 +147,6 @@ func (s *smartContractServiceHyperledger) CreateTransaction(
 	functionName string,
 	args ...string,
 ) (string, error) {
-	fmt.Println("args ", args)
 	result, err := s.contract.SubmitTransaction(functionName, args...)
 	if err != nil {
 		return "", wrapError(functionName, err)

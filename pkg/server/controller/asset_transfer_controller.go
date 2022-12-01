@@ -274,10 +274,63 @@ func (c *assetTransferController) newAcceptAssetRequestReceivedHandler(
 
 	c.nodeController.FetchPrivateEdges(
 		ctx,
+		user,
 		exposedPrivateConnections,
 		&asset.Node,
 		true,
 	)
+}
+
+func (c *assetTransferController) FetchPrivateEdges(
+	ctx context.Context,
+	user *model_server.User,
+	requestId model_server.RequestId,
+) ([]any, error) {
+	txId, err := c.transactionManager.BypassTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer c.transactionManager.StopBypassedTransaction(ctx, txId)
+
+	request, err := c.assetTransferRepository.FetchAssetAcceptRequestsById(
+		ctx,
+		txId,
+		user,
+		requestId,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	namespace := fmt.Sprintf("%d", user.ID)
+	assets, err := c.assetRepository.FetchAssetsByDbIds(
+		ctx,
+		txId,
+		namespace,
+		map[model_server.NodeDbId]bool{
+			request.AssetId: true,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(assets) == 0 {
+		return nil, utility.ErrNotFound
+	}
+
+	asset := assets[0]
+	relatedNodes, err := c.nodeController.FetchPrivateEdges(
+		ctx,
+		user,
+		request.ExposedPrivateConnections,
+		&asset.Node,
+		true,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return relatedNodes, nil
 }
 
 func (c *assetTransferController) GetRequestsToAcceptAsset(
@@ -401,11 +454,10 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 		isNewConnectionSecretOrPublic,
 		toInformSenderOfNewId,
 	)
-	assetTransferRequest = *tempAssetTransferRequest
-
 	if err != nil {
 		return nil, err
 	}
+	assetTransferRequest = *tempAssetTransferRequest
 
 	// save new asset to repository
 	newAsset, updatedCurrentAsset, err := c.updateCurrentAssetAndNewAsset(

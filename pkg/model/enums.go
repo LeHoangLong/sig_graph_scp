@@ -11,6 +11,7 @@ type ENodeType = string
 
 const (
 	ENodeTypeAsset ENodeType = "asset"
+	ENodeTypeNode  ENodeType = "node"
 )
 
 type EPeerProtocol = string

@@ -92,3 +92,15 @@ func ToSigGraphNode(node *Node) model_sig_graph.Node {
 		OwnerPublicKey:           node.OwnerPublicKey,
 	}
 }
+
+func ReversePrivateId(id *PrivateId) PrivateId {
+	return PrivateId{
+		ThisId:     id.OtherId,
+		ThisHash:   id.OtherHash,
+		ThisSecret: id.OtherSecret,
+
+		OtherId:     id.ThisId,
+		OtherHash:   id.ThisHash,
+		OtherSecret: id.ThisSecret,
+	}
+}
