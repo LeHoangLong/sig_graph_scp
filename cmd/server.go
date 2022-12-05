@@ -164,6 +164,7 @@ func main() {
 		3600*24*365,
 		"api.dev.com",
 	)
+	cors := middleware.CORSMiddleware()
 
 	// view
 	assetView := view.NewAssetView(assetController)
@@ -173,6 +174,7 @@ func main() {
 	userView := view.NewUserView(userController, auth, auth)
 
 	// api
+	router.Use(cors)
 	api := router.Group("")
 	{
 		// user
