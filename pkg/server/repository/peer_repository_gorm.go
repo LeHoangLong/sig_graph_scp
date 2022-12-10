@@ -34,6 +34,7 @@ type gormPeer struct {
 	ProtocolId       uint32
 	ConnectionUri    string
 	PeerPemPublicKey string
+	PeerName         string
 }
 
 type gormFetchPeer struct {
@@ -44,6 +45,7 @@ type gormFetchPeer struct {
 	VersionMinor     uint32
 	ConnectionUri    string
 	PeerPemPublicKey string
+	PeerName         string
 }
 
 func toModelServerPeer(peer *gormFetchPeer) model_server.Peer {
@@ -57,6 +59,7 @@ func toModelServerPeer(peer *gormFetchPeer) model_server.Peer {
 		},
 		ConnectionUri:    peer.ConnectionUri,
 		PeerPemPublicKey: peer.PeerPemPublicKey,
+		Name:             peer.PeerName,
 	}
 }
 
@@ -80,7 +83,8 @@ func (r *peerRepositoryGorm) FetchPeerById(
 			protocol.version_major,
 			protocol.version_minor,
 			peer.connection_uri,
-			peer.peer_pem_public_key
+			peer.peer_pem_public_key,
+			peer.peer_name
 		FROM gorm_peers peer
 			JOIN gorm_peer_protocols protocol 
 			ON peer.protocol_id  = protocol.id 
@@ -120,7 +124,8 @@ func (r *peerRepositoryGorm) FetchPeersByUser(
 			protocol.version_major,
 			protocol.version_minor,
 			peer.connection_uri,
-			peer.peer_pem_public_key
+			peer.peer_pem_public_key,
+			peer.peer_name
 		FROM gorm_peers peer
 			JOIN gorm_peer_protocols protocol 
 			ON peer.protocol_id  = protocol.id 
@@ -170,6 +175,7 @@ func (r *peerRepositoryGorm) AddPeerToUser(
 		ProtocolId:       protocol.ID,
 		ConnectionUri:    peer.ConnectionUri,
 		PeerPemPublicKey: peer.PeerPemPublicKey,
+		PeerName:         peer.Name,
 	}
 
 	err = tx.Create(&gormPeer).Error

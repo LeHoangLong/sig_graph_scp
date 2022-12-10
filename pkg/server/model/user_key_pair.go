@@ -6,9 +6,9 @@ type UserKeyPairId = uint64
 
 // public and private key in pem encoded form
 type UserKeyPair struct {
-	Id      UserKeyPairId
-	Public  string
-	Private string
+	Id      UserKeyPairId `json:"id"`
+	Public  string        `json:"public"`
+	Private string        `json:"private"`
 }
 
 func ToSigGraphUserKeyPair(

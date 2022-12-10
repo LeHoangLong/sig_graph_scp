@@ -22,6 +22,7 @@ type Peer struct {
 	ConnectionUri string       `json:"connection_uri"`
 
 	PeerPemPublicKey string `json:"peer_pem_public_key"`
+	Name             string `json:"name"`
 }
 
 func ToAssetTransferPeerProtocol(protocol *PeerProtocol) model_asset_transfer.PeerProtocol {

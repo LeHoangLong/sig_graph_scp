@@ -21,5 +21,6 @@ type PeerControllerI interface {
 		versionMinor uint32,
 		connectionUri string,
 		peerPemPublicKey string,
+		peerName string,
 	) (*model_server.Peer, error)
 }

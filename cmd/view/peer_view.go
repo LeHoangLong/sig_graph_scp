@@ -58,6 +58,7 @@ type CreatePeerRequest struct {
 	VersionMinor     uint32                `form:"version_minor"`
 	ConnectionUri    string                `form:"connection_uri"`
 	PeerPemPublicKey *multipart.FileHeader `form:"peer_pem_public_key"`
+	PeerName         string                `form:"peer_name"`
 }
 
 func (v *peerView) CreatePeer(c *gin.Context) {
@@ -94,6 +95,7 @@ func (v *peerView) CreatePeer(c *gin.Context) {
 		request.VersionMinor,
 		request.ConnectionUri,
 		publicKey,
+		request.PeerName,
 	)
 	if err != nil {
 		utility.AbortWithError(c, err)

@@ -37,7 +37,7 @@ func main() {
 	migrator := repository_server.NewMigratorGorm(&versionRepository, transactionManager)
 	{
 		ctx := context.Background()
-		err := migrator.Down(ctx, 0)
+		err := migrator.Down(ctx, 1)
 		if err != nil {
 			panic(fmt.Sprintf("could not migrate database: %s", err))
 		}

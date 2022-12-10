@@ -48,6 +48,7 @@ func (c *peerController) AddPeerToUser(
 	versionMinor uint32,
 	connectionUri string,
 	peerPemPublicKey string,
+	peerName string,
 ) (*model_server.Peer, error) {
 	tx, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
@@ -64,6 +65,7 @@ func (c *peerController) AddPeerToUser(
 		},
 		ConnectionUri:    connectionUri,
 		PeerPemPublicKey: peerPemPublicKey,
+		Name:             peerName,
 	}
 
 	err = c.peerRepository.AddPeerToUser(ctx, tx, &peer)
