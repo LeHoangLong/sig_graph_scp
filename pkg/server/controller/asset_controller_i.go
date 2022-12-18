@@ -31,6 +31,7 @@ type AssetControllerI interface {
 	GetOwnedAssetsFromCache(
 		ctx context.Context,
 		user *model_server.User,
+		isTransferred []bool,
 		pagination repository_server.PaginationOption[model_server.NodeDbId],
 	) ([]model_server.Asset, error)
 

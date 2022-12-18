@@ -105,6 +105,7 @@ func (r *assetRepositoryGorm) FetchAssetsByOwner(
 	transactionId TransactionId,
 	namespace string,
 	ownerPublicKey string,
+	finalizeStatus []bool,
 	pagination PaginationOption[model_server.NodeDbId],
 ) ([]model_server.Asset, error) {
 	tx, err := r.transactionManagerGorm.GetTransaction(ctx, transactionId)
@@ -118,6 +119,7 @@ func (r *assetRepositoryGorm) FetchAssetsByOwner(
 		model.ENodeTypeAsset,
 		namespace,
 		ownerPublicKey,
+		finalizeStatus,
 		pagination,
 	)
 

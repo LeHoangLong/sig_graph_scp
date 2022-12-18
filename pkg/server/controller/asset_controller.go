@@ -201,6 +201,7 @@ func (c *assetController) GetAssetById(ctx context.Context, user *model_server.U
 func (c *assetController) GetOwnedAssetsFromCache(
 	ctx context.Context,
 	user *model_server.User,
+	isTransferred []bool,
 	pagination repository_server.PaginationOption[model_server.NodeDbId],
 ) ([]model_server.Asset, error) {
 	transactionId, err := c.transactionManager.BypassTransaction(ctx)
@@ -226,7 +227,14 @@ func (c *assetController) GetOwnedAssetsFromCache(
 			MinId: pagination.MinId,
 			Limit: remainingLimit,
 		}
-		assets, err := c.repository.FetchAssetsByOwner(ctx, transactionId, fmt.Sprintf("%d", user.ID), key.Public, assetPagination)
+		assets, err := c.repository.FetchAssetsByOwner(
+			ctx,
+			transactionId,
+			fmt.Sprintf("%d", user.ID),
+			key.Public,
+			isTransferred,
+			assetPagination,
+		)
 		if err != nil {
 			return nil, err
 		}

@@ -186,6 +186,7 @@ func main() {
 		api.GET("/assets", auth.Authenticate, assetView.GetAssetById)
 		api.POST("/assets", auth.Authenticate, assetView.CreateAsset)
 		api.GET("/assets/db_ids", auth.Authenticate, assetView.GetAssetByDbId)
+		api.GET("/assets/cache/owned", auth.Authenticate, assetView.GetOwnedAssetsFromCache)
 
 		// user key pair
 		api.GET("/key_pairs", auth.Authenticate, userKeyPairView.GetUserKeyPairsByUser)

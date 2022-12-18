@@ -275,6 +275,7 @@ func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(
 	nodeType model.ENodeType,
 	namespace string,
 	ownerPublicKey string,
+	finalizeStatus []bool,
 	pagination PaginationOption[model_server.NodeDbId],
 ) ([]model_server.Node, error) {
 	nodes := []gormNode{}
@@ -284,7 +285,7 @@ func (r *nodeRepositoryGorm) FetchNodesByOwnerPublicKey(
 		return []model_server.Node{}, err
 	}
 
-	err = tx.Preload("PublicEdges").Preload("PrivateEdges").Where("node_namespace = ? AND owner_public_key = ? AND node_type = ? AND id >= ?", namespace, ownerPublicKey, nodeType, pagination.MinId).Limit(int(pagination.Limit)).Order("id asc").Find(&nodes).Error
+	err = tx.Preload("PublicEdges").Preload("PrivateEdges").Where("node_namespace = ? AND owner_public_key = ? AND node_type = ? AND is_finalized IN ? AND id >= ?", namespace, ownerPublicKey, nodeType, finalizeStatus, pagination.MinId).Limit(int(pagination.Limit)).Order("id asc").Find(&nodes).Error
 	if err != nil {
 		return []model_server.Node{}, err
 	}

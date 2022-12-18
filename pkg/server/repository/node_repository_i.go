@@ -30,7 +30,7 @@ type NodeRepositoryI interface {
 	// edge. You must use other methods if you want to delete an existing
 	// edge.
 	UpsertNode(ctx context.Context, transactionId TransactionId, iNode *model_server.Node) error
-	FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType model.ENodeType, namespace string, ownerPublicKey string, pagination PaginationOption[model_server.NodeDbId]) ([]model_server.Node, error)
+	FetchNodesByOwnerPublicKey(ctx context.Context, transactionId TransactionId, nodeType model.ENodeType, namespace string, ownerPublicKey string, finalizeStatus []bool, pagination PaginationOption[model_server.NodeDbId]) ([]model_server.Node, error)
 	FetchNodesByNodeId(ctx context.Context, transactionId TransactionId, nodeType model.ENodeType, namespace string, id map[model_server.NodeId]bool) ([]model_server.Node, error)
 	FetchNodesByDbId(ctx context.Context, transactionId TransactionId, nodeType model.ENodeType, namespace string, id map[model_server.NodeDbId]bool) ([]model_server.Node, error)
 	FetchPrivateEdgesByNodeIds(ctx context.Context, transactionId TransactionId, namespace string, edges []EdgeNodeId) ([]model_server.PrivateId, error)

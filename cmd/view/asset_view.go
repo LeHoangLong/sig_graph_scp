@@ -6,6 +6,7 @@ import (
 	utility "sig_graph_scp/cmd/utility"
 	controller_server "sig_graph_scp/pkg/server/controller"
 	model_server "sig_graph_scp/pkg/server/model"
+	repository_server "sig_graph_scp/pkg/server/repository"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -108,6 +109,43 @@ func (v *assetView) GetAssetByDbId(c *gin.Context) {
 		c.Request.Context(),
 		user,
 		idsMap,
+	)
+	if err != nil {
+		utility.AbortWithError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, assets)
+	return
+}
+
+type GetOwnedAssetsFromCacheRequest struct {
+	IsTransferred []bool                `form:"is_transferred"`
+	MinId         model_server.NodeDbId `form:"min_id"`
+	Limit         int                   `form:"limit"`
+}
+
+func (v *assetView) GetOwnedAssetsFromCache(
+	c *gin.Context,
+) {
+	user := middleware.GetUser(c.Request.Context())
+
+	request := GetOwnedAssetsFromCacheRequest{}
+	if err := c.ShouldBind(&request); err != nil {
+		utility.AbortBadRequest(c, err)
+		return
+	}
+
+	pagination := repository_server.PaginationOption[model_server.NodeDbId]{
+		MinId: request.MinId,
+		Limit: request.Limit,
+	}
+
+	assets, err := v.controller.GetOwnedAssetsFromCache(
+		c.Request.Context(),
+		user,
+		request.IsTransferred,
+		pagination,
 	)
 	if err != nil {
 		utility.AbortWithError(c, err)
