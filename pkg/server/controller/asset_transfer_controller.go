@@ -64,7 +64,7 @@ func (c *assetTransferController) TransferAsset(
 	assetId model_server.NodeDbId,
 	peerId model_server.PeerDbId,
 	exposedSecretIds []repository_server.EdgeNodeId,
-	isNewConnectionPublicOrPrivate bool,
+	isNewConnectionPrivateOrPublic bool,
 ) (*model_server.RequestToAcceptAsset, error) {
 	time := c.clock.Now()
 
@@ -150,7 +150,7 @@ func (c *assetTransferController) TransferAsset(
 		&sigGraphKey,
 		&assetTransferPeer,
 		assetTransferPrivateIds,
-		isNewConnectionPublicOrPrivate,
+		isNewConnectionPrivateOrPublic,
 	)
 	if err != nil {
 		return nil, err
@@ -370,7 +370,6 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 	acceptOrRejct bool,
 	message string,
 	isNewConnectionSecretOrPublic bool,
-	toInformSenderOfNewId bool,
 ) (*model_server.RequestToAcceptAsset, error) {
 	txId, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
@@ -452,7 +451,6 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 		acceptOrRejct,
 		message,
 		isNewConnectionSecretOrPublic,
-		toInformSenderOfNewId,
 	)
 	if err != nil {
 		return nil, err
@@ -499,11 +497,11 @@ func (c *assetTransferController) SubscribeNewAssetAcceptReceivedEvent(
 	return bus.Subscribe(topic, c.newAcceptAssetReceivedHandler)
 }
 
+// TODO: better to just fetch the updated asset from sig graph and check its signature
+// agains those that we send
 func (c *assetTransferController) newAcceptAssetReceivedHandler(
 	event model_asset_transfer.AcceptAssetEvent,
 ) {
-	// TODO: if this function fails, we lose the secret id information. So we might actually want
-	// to store in some backup first.
 	ctx := context.Background()
 
 	txId, err := c.transactionManager.BypassTransaction(ctx)
@@ -527,23 +525,66 @@ func (c *assetTransferController) newAcceptAssetReceivedHandler(
 		ID: request.UserId,
 	}
 
-	if event.NewId != "" {
-		// fetch transferred asset from sig graph
-		c.assetController.GetAssetById(
-			ctx,
-			&user,
-			model_server.NodeId(event.NewId),
-			false,
-		)
+	cachedOldAssets, err := c.assetController.GetAssetsFromCacheByDbId(
+		ctx,
+		&user,
+		map[model_server.NodeDbId]bool{request.AssetId: true},
+	)
+	if err != nil {
+		return
+	}
+
+	if len(cachedOldAssets) == 0 {
+		return
+	}
+
+	cachedOldAsset := cachedOldAssets[0]
+
+	oldAsset, err := c.assetController.GetAssetById(
+		ctx,
+		&user,
+		cachedOldAsset.Id,
+		false,
+	)
+
+	newId := ""
+	newSecret := ""
+	for i := range request.CandidateIds {
+		if request.CandidateIds[i].Signature == oldAsset.Signature {
+			newId = request.CandidateIds[i].Id
+			newSecret = request.CandidateIds[i].Secret
+		}
+	}
+
+	if newId == "" {
+		return
+	}
+
+	oldSecret := ""
+	// fetch transferred asset from sig graph
+	newlyTransferredAsset, err := c.assetController.GetAssetById(
+		ctx,
+		&user,
+		model_server.NodeId(newId),
+		false,
+	)
+	if err != nil {
+		return
+	}
+
+	for hash := range newlyTransferredAsset.PrivateParentsIds {
+		if newlyTransferredAsset.PrivateParentsIds[hash].ThisId == oldAsset.Id {
+			oldSecret = newlyTransferredAsset.PrivateParentsIds[hash].ThisSecret
+		}
 	}
 
 	updatedAsset, newAsset, err := c.updateCurrentAssetAndAddNewAsset(
 		ctx,
 		&user,
 		request.AssetId,
-		event.NewId,
-		event.NewSecret,
-		event.OldSecret,
+		oldSecret,
+		newId,
+		newSecret,
 	)
 	if err != nil {
 		return
@@ -607,22 +648,14 @@ func (c *assetTransferController) updateCurrentAssetAndNewAsset(
 	return
 }
 
-// TODO: if this fail, we lose the new asset id information. So we need to
-// save to some backup first
 func (c *assetTransferController) updateCurrentAssetAndAddNewAsset(
 	ctx context.Context,
 	user *model_server.User,
 	currentAssetId model_server.NodeDbId,
+	oldSecret string,
 	newId string,
 	newSecret string,
-	oldSecret string,
 ) (updatedCurrentAsset *model_server.Asset, newAsset *model_server.Asset, err error) {
-	defer func() {
-		if err != nil {
-			//TODO: save to backup
-		}
-	}()
-
 	txId, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
 		return
@@ -657,11 +690,6 @@ func (c *assetTransferController) updateCurrentAssetAndAddNewAsset(
 	// TODO: refactor this so that the return value is
 	// actually a copy of the current asset
 	updatedCurrentAsset = currentAsset
-
-	// if we don't know where the new node is, nothing we can do
-	if newId == "" {
-		return
-	}
 
 	// add new asset
 	newAsset, err = c.assetController.GetAssetById(

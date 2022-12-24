@@ -186,7 +186,6 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 	acceptOrReject bool,
 	message string,
 	isNewConnectionSecretOrPublic bool,
-	toInformSenderOfNewId bool,
 ) (updatedRequest *model_asset_transfer.RequestToAcceptAsset, newSecret string, oldSecret string, err error) {
 	conn, err := s.connPool.NewConnection(ctx, peer.ConnectionUri)
 	if err != nil {
@@ -198,13 +197,9 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 	*updatedRequest = *request
 
 	grpcRequest := sig_graph_grpc.AcceptAssetRequest{
-		AckId:     updatedRequest.AckId,
-		Accepted:  acceptOrReject,
-		Message:   message,
-		NewId:     "",
-		NewSecret: "",
-		OldId:     "",
-		OldSecret: "",
+		AckId:    updatedRequest.AckId,
+		Accepted: acceptOrReject,
+		Message:  message,
 	}
 
 	currentSecret := ""
@@ -241,13 +236,6 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 		updatedRequest.NewAsset = newAsset
 		updatedRequest.Asset = *updatedAsset
 		break
-	}
-
-	if toInformSenderOfNewId {
-		grpcRequest.NewId = selectedCandidate.Id
-		grpcRequest.NewSecret = selectedCandidate.Secret
-		grpcRequest.OldId = updatedRequest.Asset.Id
-		grpcRequest.OldSecret = currentSecret
 	}
 
 	client := sig_graph_grpc.NewTransferAssetClient(conn)

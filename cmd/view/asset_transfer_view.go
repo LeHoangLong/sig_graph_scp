@@ -30,7 +30,7 @@ type CreateRequestToAcceptAssetRequest struct {
 	AssetId                        uint64     `json:"asset_id"`
 	PeerId                         uint64     `json:"peer_id"`
 	Edges                          []NodeEdge `json:"edges"`
-	IsNewConnectionPublicOrPrivate bool       `json:"is_new_connection_public_or_private"`
+	isNewConnectionPrivateOrPublic bool       `json:"is_new_connection_private_or_public"`
 }
 
 func (v *assetTransferView) CreateRequestToAcceptAsset(c *gin.Context) {
@@ -57,7 +57,7 @@ func (v *assetTransferView) CreateRequestToAcceptAsset(c *gin.Context) {
 		model_server.NodeDbId(request.AssetId),
 		request.PeerId,
 		exposedSecretIds,
-		request.IsNewConnectionPublicOrPrivate,
+		request.isNewConnectionPrivateOrPublic,
 	)
 
 	if err != nil {
@@ -135,7 +135,6 @@ func (v *assetTransferView) AcceptReceivedRequestToAcceptAsset(c *gin.Context) {
 		request.Accept,
 		request.Message,
 		request.IsNewConnectionSecret,
-		request.ToInformSenderOfNewId,
 	)
 	if err != nil {
 		utility.AbortWithError(c, err)

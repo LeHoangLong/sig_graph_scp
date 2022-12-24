@@ -14,10 +14,6 @@ func (s *assetAcceptHandlerDefault) HandleAssetAccept(
 	ackId string,
 	isAcceptedOrRejected bool,
 	message string,
-	newId string,
-	newSecret string,
-	oldId string,
-	oldSecret string,
 ) {
 
 }

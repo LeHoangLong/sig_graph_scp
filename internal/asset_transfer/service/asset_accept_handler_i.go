@@ -8,9 +8,5 @@ type AssetAcceptHandlerI interface {
 		ackId string,
 		isAcceptedOrRejected bool,
 		message string,
-		newId string,
-		newSecret string,
-		oldId string,
-		oldSecret string,
 	)
 }

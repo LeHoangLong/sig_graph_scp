@@ -42,10 +42,6 @@ message AcceptAssetRequest {
     string ack_id  = 1;
     bool accepted = 2;
     string message = 3;
-    string new_id = 4; // new asset id
-    string new_secret = 5; // new asset secret, used to generate hash that is stored on old node side
-    string old_id = 8; // old asset id
-    string old_secret = 9; // old asset secret, used to generate hash that is stored on new node side
 }
 
 message AcceptAssetResponse {}

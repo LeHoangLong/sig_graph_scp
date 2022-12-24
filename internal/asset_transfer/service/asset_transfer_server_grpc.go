@@ -156,10 +156,6 @@ func (s *assetTransferServerGrpc) AcceptAsset(
 		request.AckId,
 		request.Accepted,
 		request.Message,
-		request.NewId,
-		request.NewSecret,
-		request.OldId,
-		request.OldSecret,
 	)
 
 	return &sig_graph_grpc.AcceptAssetResponse{}, nil

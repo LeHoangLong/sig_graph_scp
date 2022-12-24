@@ -27,19 +27,11 @@ func (s *assetAcceptHandlerEventBus) HandleAssetAccept(
 	ackId string,
 	isAcceptedOrRejected bool,
 	message string,
-	newId string,
-	newSecret string,
-	oldId string,
-	oldSecret string,
 ) {
 	event := model_asset_transfer.AcceptAssetEvent{
 		AckId:      ackId,
 		IsAccepted: isAcceptedOrRejected,
 		Message:    message,
-		NewId:      newId,
-		NewSecret:  newSecret,
-		OldId:      oldId,
-		OldSecret:  oldSecret,
 	}
 	s.bus.Publish(s.topicName, event)
 }

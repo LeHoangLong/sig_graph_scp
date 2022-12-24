@@ -14,7 +14,7 @@ type AssetTransferControllerI interface {
 		assetId model_server.NodeDbId,
 		peerId model_server.PeerDbId,
 		exposedSecretIds []repository_server.EdgeNodeId,
-		isNewConnectionPublicOrPrivate bool,
+		isNewConnectionPrivateOrPublic bool,
 	) (*model_server.RequestToAcceptAsset, error)
 
 	GetRequestsToAcceptAsset(
@@ -33,7 +33,6 @@ type AssetTransferControllerI interface {
 		acceptOrRejct bool,
 		message string,
 		isNewConnectionSecretOrPublic bool,
-		toInformSenderOfNewId bool,
 	) (*model_server.RequestToAcceptAsset, error)
 
 	FetchPrivateEdges(

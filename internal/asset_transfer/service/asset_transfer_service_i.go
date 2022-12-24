@@ -28,9 +28,6 @@ type AssetTransferServiceI interface {
 	// will reference back to the current node with a private edge.
 	// The consequence of this is that other participants will not be
 	// able to trace backward to the old asset without any secret id.
-	// - if toInformSenderOfNewId is true, the sender will receive the
-	// new node id and secret and thus can trace forward. Otherwise, the sender
-	// cannot trace forward if isNewConnectionSecretOrPublic is true.
 	AcceptRequestToAcceptAsset(
 		ctx context.Context,
 		peer *model_asset_transfer.Peer,
@@ -38,7 +35,6 @@ type AssetTransferServiceI interface {
 		acceptOrReject bool,
 		message string,
 		isNewConnectionSecretOrPublic bool,
-		toInformSenderOfNewId bool,
 	) (updatedRequest *model_asset_transfer.RequestToAcceptAsset, newSecret string, oldSecret string, err error)
 
 	SetNumberOfCandidatesSignature(ctx context.Context, numberOfCandidate uint32) error

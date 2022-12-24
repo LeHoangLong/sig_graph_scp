@@ -29,7 +29,6 @@ type AssetTransferServiceApi interface {
 		acceptOrReject bool,
 		message string,
 		isNewConnectionSecretOrPublic bool,
-		toInformSenderOfNewId bool,
 	) (updatedRequest *model_asset_transfer.RequestToAcceptAsset, newSecret string, oldSecret string, err error)
 }
 
@@ -97,7 +96,6 @@ func (s *assetTransferServiceApi) AcceptRequestToAcceptAsset(
 	acceptOrReject bool,
 	message string,
 	isNewConnectionSecretOrPublic bool,
-	toInformSenderOfNewId bool,
 ) (updatedRequest *model_asset_transfer.RequestToAcceptAsset, newSecret string, oldSecret string, err error) {
 	return s.assetTransferService.AcceptRequestToAcceptAsset(
 		ctx,
@@ -106,6 +104,5 @@ func (s *assetTransferServiceApi) AcceptRequestToAcceptAsset(
 		acceptOrReject,
 		message,
 		isNewConnectionSecretOrPublic,
-		toInformSenderOfNewId,
 	)
 }
