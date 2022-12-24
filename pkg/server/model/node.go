@@ -37,6 +37,8 @@ type Node struct {
 	UpdatedTime    uint64 `json:"updated_time"`
 	Signature      string `json:"signature"`
 	OwnerPublicKey string `json:"owner_public_key"`
+
+	Extra any `json:"-"`
 }
 
 func ToAssetTransferPrivateId(privateId *PrivateId) model_asset_transfer.PrivateId {

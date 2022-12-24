@@ -43,6 +43,7 @@ func (r *assetRepositoryGorm) SaveAsset(ctx context.Context, transactionId Trans
 	if err != nil {
 		return err
 	}
+	iAsset.Node.Extra = iAsset
 
 	tx, err := r.transactionManagerGorm.GetTransaction(ctx, transactionId)
 	if err != nil {
@@ -94,6 +95,7 @@ func (r *assetRepositoryGorm) fetchAssetsFromNodes(ctx context.Context, tx *gorm
 			MaterialName:    assets[i].MaterialName,
 		}
 
+		asset.Node.Extra = &asset
 		ret = append(ret, asset)
 	}
 
@@ -173,10 +175,10 @@ func (r *assetRepositoryGorm) FetchNode(
 	ctx context.Context,
 	txId TransactionId,
 	node *model_server.Node,
-) (any, error) {
+) (model_server.Node, error) {
 	tx, err := r.transactionManagerGorm.GetTransaction(ctx, txId)
 	if err != nil {
-		return model_server.Asset{}, err
+		return model_server.Node{}, err
 	}
 
 	assets, err := r.fetchAssetsFromNodes(ctx, tx, []model_server.Node{
@@ -184,39 +186,34 @@ func (r *assetRepositoryGorm) FetchNode(
 	})
 
 	if err != nil {
-		return model_server.Asset{}, err
+		return model_server.Node{}, err
 	}
 
 	if len(assets) == 0 {
-		return model_server.Asset{}, utility.ErrNotFound
+		return model_server.Node{}, utility.ErrNotFound
 	}
 
-	return assets[0], nil
+	return assets[0].Node, nil
 }
 
 func (r *assetRepositoryGorm) UpsertNode(
 	ctx context.Context,
 	txId TransactionId,
-	nodePtr any,
-) (any, error) {
-	var ptr *any
-	var ok bool
-	if ptr, ok = nodePtr.(*any); !ok {
-		return model_server.Asset{}, utility.ErrInvalidArgument
-	}
-
-	if asset, ok := (*ptr).(model_server.Asset); ok {
+	node *model_server.Node,
+) (model_server.Node, error) {
+	if asset, ok := node.Extra.(*model_server.Asset); ok {
+		clonedAsset := *asset
 		err := r.SaveAsset(
 			ctx,
 			txId,
-			&asset,
+			&clonedAsset,
 		)
 		if err != nil {
-			return model_server.Asset{}, err
+			return model_server.Node{}, err
 		}
 
-		return asset, nil
+		return clonedAsset.Node, nil
 	}
 
-	return model_server.Asset{}, utility.ErrInvalidArgument
+	return model_server.Node{}, utility.ErrInvalidArgument
 }

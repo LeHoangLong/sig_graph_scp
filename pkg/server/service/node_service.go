@@ -27,7 +27,7 @@ type NodeServiceI interface {
 		exposedPrivateConnections map[string]model_server.PrivateId,
 		endNode *model_server.Node,
 		useCache bool,
-	) (relatedNodes []any, err error)
+	) (relatedNodes []model_server.Node, err error)
 
 	// retuns NotFound if any of id is not found
 	// return model is in the model_server package
@@ -37,7 +37,7 @@ type NodeServiceI interface {
 		user *model_server.User,
 		ids map[model_server.NodeId]bool,
 		useCache bool,
-	) (map[model_server.NodeId]any, error)
+	) (map[model_server.NodeId]model_server.Node, error)
 }
 
 func NewNodeService(
@@ -91,9 +91,9 @@ func (s *nodeService) FetchPrivateEdges(
 	exposedPrivateConnections map[string]model_server.PrivateId,
 	endNode *model_server.Node,
 	useCache bool,
-) ([]any, error) {
+) ([]model_server.Node, error) {
 	reversedIds := map[string]model_server.PrivateId{}
-	relatedNodesMap := map[model_server.NodeId]any{}
+	relatedNodesMap := map[model_server.NodeId]model_server.Node{}
 	// reverse the exposed connections so that we also fetch them
 	for _, privateId := range exposedPrivateConnections {
 		reversedId := model_server.ReversePrivateId(&privateId)
@@ -117,7 +117,9 @@ func (s *nodeService) FetchPrivateEdges(
 		return nil, err
 	}
 
-	relatedNodesMapWithStringKey := map[string]any{}
+	relatedNodesMapWithStringKey := map[string]model_server.Node{
+		string(endNode.Id): *endNode,
+	}
 	for id := range relatedNodesMap {
 		relatedNodesMapWithStringKey[string(id)] = relatedNodesMap[id]
 	}
@@ -133,7 +135,7 @@ func (s *nodeService) FetchPrivateEdges(
 		return nil, err
 	}
 
-	ret := []any{}
+	ret := []model_server.Node{}
 	for id := range savedNodes {
 		ret = append(ret, savedNodes[id])
 	}
@@ -146,7 +148,7 @@ func (s *nodeService) FetchNodesByIds(
 	user *model_server.User,
 	ids map[model_server.NodeId]bool,
 	useCache bool,
-) (map[model_server.NodeId]any, error) {
+) (map[model_server.NodeId]model_server.Node, error) {
 	namepsace := fmt.Sprintf("%d", user.ID)
 	return s.fetchNodesByIds(
 		ctx,
@@ -163,12 +165,12 @@ func (s *nodeService) fetchNodesByIds(
 	namespace string,
 	ids map[model_server.NodeId]bool,
 	useCache bool,
-) (map[model_server.NodeId]any, error) {
+) (map[model_server.NodeId]model_server.Node, error) {
 	var err error
-	cachedNodes := map[model_server.NodeId]any{}
+	cachedNodes := map[model_server.NodeId]model_server.Node{}
 	nodesToFetch := map[string]bool{}
 	if len(ids) == 0 {
-		return map[model_server.NodeId]any{}, nil
+		return map[model_server.NodeId]model_server.Node{}, nil
 	}
 
 	if useCache {
@@ -178,6 +180,7 @@ func (s *nodeService) fetchNodesByIds(
 			namespace,
 			ids,
 		)
+
 		if err != nil {
 			return nil, err
 		}
@@ -220,8 +223,8 @@ func (s *nodeService) fetchCachedNodes(
 	txId repository_server.TransactionId,
 	namespace string,
 	ids map[model_server.NodeId]bool,
-) (map[model_server.NodeId]any, error) {
-	cachedNodes := map[model_server.NodeId]any{}
+) (map[model_server.NodeId]model_server.Node, error) {
+	extendedNodes := map[model_server.NodeId]model_server.Node{}
 	nodes, err := s.nodeRepository.FetchNodesByNodeId(
 		ctx,
 		txId,
@@ -234,7 +237,7 @@ func (s *nodeService) fetchCachedNodes(
 	}
 	for i := range nodes {
 		nodeType := nodes[i].NodeType
-		cachedNodes[nodes[i].Id], err = s.genericNodeRepository[nodeType].FetchNode(
+		extendedNodes[nodes[i].Id], err = s.genericNodeRepository[nodeType].FetchNode(
 			ctx,
 			txId,
 			&nodes[i],
@@ -245,16 +248,16 @@ func (s *nodeService) fetchCachedNodes(
 		}
 	}
 
-	return cachedNodes, nil
+	return extendedNodes, nil
 }
 
 func (s *nodeService) saveGenericModel(
 	ctx context.Context,
 	txId repository_server.TransactionId,
 	namespace string,
-	modelNodes map[string]any,
-) (map[model_server.NodeId]any, error) {
-	savedNodes := map[model_server.NodeId]any{}
+	modelNodes map[string]model_server.Node,
+) (map[model_server.NodeId]model_server.Node, error) {
+	savedNodes := map[model_server.NodeId]model_server.Node{}
 	for id := range modelNodes {
 		_, nodeType, err := s.extractServerNode(modelNodes[id])
 		if err != nil {
@@ -281,8 +284,8 @@ func (s *nodeService) saveGenericSigGraphNodeAndConvertToModel(
 	txId repository_server.TransactionId,
 	namespace string,
 	sigGraphNodes map[string]any,
-) (map[model_server.NodeId]any, error) {
-	savedNodes := map[model_server.NodeId]any{}
+) (map[model_server.NodeId]model_server.Node, error) {
+	savedNodes := map[model_server.NodeId]model_server.Node{}
 	for id := range sigGraphNodes {
 		parsedNode, nodeType, err := s.parseSigGraphNodeToServerNode(sigGraphNodes[id], namespace)
 		if err != nil {
@@ -294,6 +297,7 @@ func (s *nodeService) saveGenericSigGraphNodeAndConvertToModel(
 			txId,
 			&parsedNode,
 		)
+
 		if err != nil {
 			return nil, err
 		}
@@ -309,7 +313,7 @@ func (s *nodeService) fetchPrivateEdges(
 	namespace string,
 	exposedPrivateConnections map[string]model_server.PrivateId,
 	node *model_server.Node,
-	fetchedNodes map[model_server.NodeId]any,
+	fetchedNodes map[model_server.NodeId]model_server.Node,
 	useCache bool,
 ) error {
 	nodesToFetch := s.buildNodesToFetchMap(
@@ -335,11 +339,6 @@ func (s *nodeService) fetchPrivateEdges(
 	}
 
 	for id := range newlyFetchedNodes {
-		node, _, err := s.extractServerNode(newlyFetchedNodes[id])
-		if err != nil {
-			return err
-		}
-
 		for hash := range exposedPrivateConnections {
 			exposedPrivateId := exposedPrivateConnections[hash]
 			otherHash := exposedPrivateConnections[hash].OtherHash
@@ -366,12 +365,16 @@ func (s *nodeService) fetchPrivateEdges(
 			}
 		}
 
+		fetchedNode, _, err := s.extractServerNode(newlyFetchedNodes[id])
+		if err != nil {
+			return err
+		}
 		err = s.fetchPrivateEdges(
 			ctx,
 			txId,
 			namespace,
 			exposedPrivateConnections,
-			&node,
+			&fetchedNode,
 			fetchedNodes,
 			useCache,
 		)
@@ -384,6 +387,9 @@ func (s *nodeService) fetchPrivateEdges(
 
 func (s *nodeService) extractServerNode(iNode any) (extractedNode model_server.Node, nodeType model.ENodeType, err error) {
 	if node, ok := iNode.(model_server.Node); ok {
+		if asset, ok := node.Extra.(*model_server.Asset); ok {
+			return asset.Node, model.ENodeTypeAsset, nil
+		}
 		return node, model.ENodeTypeNode, nil
 	} else if node, ok := iNode.(model_server.Asset); ok {
 		return node.Node, model.ENodeTypeAsset, nil
@@ -404,10 +410,10 @@ func (s *nodeService) extractSigGraphNode(iNode any) (extractedNode model_sig_gr
 
 // create model_server structs from model_sig_graph structs
 // fields that cannot be filled will be filled with default values
-func (s *nodeService) parseSigGraphNodeToServerNode(iNode any, namspace string) (modelServerNode any, nodeType model.ENodeType, err error) {
+func (s *nodeService) parseSigGraphNodeToServerNode(iNode any, namspace string) (modelServerNode model_server.Node, nodeType model.ENodeType, err error) {
 	extractedNode, err := s.extractSigGraphNode(iNode)
 	if err != nil {
-		return nil, "", err
+		return model_server.Node{}, "", err
 	}
 
 	privateParentIds := map[string]model_server.PrivateId{}
@@ -436,7 +442,7 @@ func (s *nodeService) parseSigGraphNodeToServerNode(iNode any, namspace string) 
 				&asset,
 				&modelNode,
 			)
-			return modelAsset, model.ENodeTypeAsset, nil
+			return modelAsset.Node, model.ENodeTypeAsset, nil
 		}
 	default:
 		return model_server.Node{}, "", utility.ErrInvalidArgument
@@ -447,7 +453,7 @@ func (s *nodeService) buildNodesToFetchMap(
 	ctx context.Context,
 	exposedPrivateConnections map[string]model_server.PrivateId,
 	node *model_server.Node,
-	fetchedNodes map[model_server.NodeId]any,
+	fetchedNodes map[model_server.NodeId]model_server.Node,
 ) map[model_server.NodeId]bool {
 	nodesToFetch := map[model_server.NodeId]bool{}
 	for hash := range node.PrivateParentsIds {

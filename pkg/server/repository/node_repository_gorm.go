@@ -315,8 +315,15 @@ func (r *nodeRepositoryGorm) FetchNodesByNodeId(
 		ids = append(ids, id)
 	}
 
+	query := "node_namespace = ? AND node_id IN ?"
+	queryArgs := []any{namespace, ids}
+	if nodeType != ENodeTypeAny {
+		query += " AND node_type = ?"
+		queryArgs = append(queryArgs, nodeType)
+	}
+
 	nodes := []gormNode{}
-	err = tx.Preload("PublicEdges").Preload("PrivateEdges").Where("node_namespace = ? AND node_id IN ? AND node_type = ?", namespace, ids, nodeType).Find(&nodes).Error
+	err = tx.Preload("PublicEdges").Preload("PrivateEdges").Where(query, queryArgs...).Find(&nodes).Error
 	if err != nil {
 		return []model_server.Node{}, err
 	}

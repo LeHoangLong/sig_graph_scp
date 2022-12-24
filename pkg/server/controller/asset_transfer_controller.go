@@ -285,7 +285,7 @@ func (c *assetTransferController) FetchPrivateEdges(
 	ctx context.Context,
 	user *model_server.User,
 	requestId model_server.RequestId,
-) ([]any, error) {
+) ([]model_server.Node, error) {
 	txId, err := c.transactionManager.BypassTransaction(ctx)
 	if err != nil {
 		return nil, err

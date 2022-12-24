@@ -39,7 +39,7 @@ type AssetTransferControllerI interface {
 		ctx context.Context,
 		user *model_server.User,
 		requestId model_server.RequestId,
-	) ([]any, error)
+	) ([]model_server.Node, error)
 
 	/*
 

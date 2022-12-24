@@ -18,5 +18,5 @@ type NodeControllerI interface {
 		exposedPrivateConnections map[string]model_server.PrivateId,
 		endNode *model_server.Node,
 		useCache bool,
-	) (relatedNodes []any, err error)
+	) (relatedNodes []model_server.Node, err error)
 }

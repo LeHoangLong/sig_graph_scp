@@ -16,13 +16,16 @@ type Asset struct {
 }
 
 func FromSigGraphAsset(asset *model_sig_graph.Asset, modelNode *Node) Asset {
-	return Asset{
+	newAsset := Asset{
 		Node:            *modelNode,
 		CreationProcess: asset.CreationProcess,
 		Unit:            asset.Unit,
 		Quantity:        asset.Quantity,
 		MaterialName:    asset.MaterialName,
 	}
+
+	newAsset.Node.Extra = &newAsset
+	return newAsset
 }
 
 func ToSigGraphAsset(asset *Asset) model_sig_graph.Asset {

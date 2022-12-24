@@ -11,11 +11,11 @@ type GenericNodeRepositoryI interface {
 		ctx context.Context,
 		txId TransactionId,
 		node *model_server.Node,
-	) (fetchedNode any, err error)
+	) (fetchedNode model_server.Node, err error)
 
 	UpsertNode(
 		ctx context.Context,
 		txId TransactionId,
-		nodePtr any,
-	) (savedNode any, err error)
+		node *model_server.Node,
+	) (savedNode model_server.Node, err error)
 }
