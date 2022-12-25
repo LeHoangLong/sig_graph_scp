@@ -208,6 +208,9 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 			isNewConnectionSecretOrPublic,
 			updatedRequest,
 		)
+		if err != nil {
+			return
+		}
 	}
 
 	client := sig_graph_grpc.NewTransferAssetClient(conn)
