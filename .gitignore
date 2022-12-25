@@ -5,3 +5,5 @@ dev/*
 *.pem
 *.crt
 *.key
+*.srl
+*.csr
