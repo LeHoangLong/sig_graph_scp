@@ -457,17 +457,22 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 	}
 	assetTransferRequest = *tempAssetTransferRequest
 
-	// save new asset to repository
-	newAsset, updatedCurrentAsset, err := c.updateCurrentAssetAndNewAsset(
-		ctx,
-		user,
-		assetTransferRequest.NewAsset.Id,
-		newSecret,
-		assetTransferRequest.Asset.Id,
-		oldSecret,
-	)
-	if err != nil {
-		return nil, err
+	if acceptOrRejct {
+		// save new asset to repository
+		newAsset, updatedCurrentAsset, err := c.updateCurrentAssetAndNewAsset(
+			ctx,
+			user,
+			assetTransferRequest.NewAsset.Id,
+			newSecret,
+			assetTransferRequest.Asset.Id,
+			oldSecret,
+		)
+		if err != nil {
+			return nil, err
+		}
+		request.AssetId = updatedCurrentAsset.NodeDbId
+		request.NewAssetId = new(model_server.NodeDbId)
+		*request.NewAssetId = newAsset.NodeDbId
 	}
 
 	// update request
@@ -477,9 +482,6 @@ func (c *assetTransferController) AcceptReceivedRequestsToAcceptAsset(
 		request.Status = model.ERequestToAcceptAssetStatusRejected
 	}
 	request.AcceptMessage = message
-	request.AssetId = updatedCurrentAsset.NodeDbId
-	request.NewAssetId = new(model_server.NodeDbId)
-	*request.NewAssetId = newAsset.NodeDbId
 
 	err = c.assetTransferRepository.UpdateAssetAcceptRequest(ctx, txId, request)
 	if err != nil {
@@ -497,8 +499,6 @@ func (c *assetTransferController) SubscribeNewAssetAcceptReceivedEvent(
 	return bus.Subscribe(topic, c.newAcceptAssetReceivedHandler)
 }
 
-// TODO: better to just fetch the updated asset from sig graph and check its signature
-// agains those that we send
 func (c *assetTransferController) newAcceptAssetReceivedHandler(
 	event model_asset_transfer.AcceptAssetEvent,
 ) {
@@ -525,24 +525,61 @@ func (c *assetTransferController) newAcceptAssetReceivedHandler(
 		ID: request.UserId,
 	}
 
+	if event.IsAccepted {
+		c.syncRequestWithCurrentAndNewAsset(
+			ctx,
+			&user,
+			request,
+		)
+	}
+
+	c.updateRequestStatus(ctx, request, event.IsAccepted, event.Message, txId)
+}
+
+func (c *assetTransferController) updateRequestStatus(
+	ctx context.Context,
+	request *model_server.RequestToAcceptAsset,
+	isAccepted bool,
+	message string,
+	txId repository_server.TransactionId,
+) error {
+	if isAccepted {
+		request.Status = model.ERequestToAcceptAssetStatusAccepted
+	} else {
+		request.Status = model.ERequestToAcceptAssetStatusRejected
+	}
+
+	request.AcceptMessage = message
+	return c.assetTransferRepository.UpdateAssetAcceptRequest(
+		ctx,
+		txId,
+		request,
+	)
+}
+
+func (c *assetTransferController) syncRequestWithCurrentAndNewAsset(
+	ctx context.Context,
+	user *model_server.User,
+	request *model_server.RequestToAcceptAsset,
+) error {
 	cachedOldAssets, err := c.assetController.GetAssetsFromCacheByDbId(
 		ctx,
-		&user,
+		user,
 		map[model_server.NodeDbId]bool{request.AssetId: true},
 	)
 	if err != nil {
-		return
+		return err
 	}
 
 	if len(cachedOldAssets) == 0 {
-		return
+		return utility.ErrNotFound
 	}
 
 	cachedOldAsset := cachedOldAssets[0]
 
 	oldAsset, err := c.assetController.GetAssetById(
 		ctx,
-		&user,
+		user,
 		cachedOldAsset.Id,
 		false,
 	)
@@ -557,19 +594,19 @@ func (c *assetTransferController) newAcceptAssetReceivedHandler(
 	}
 
 	if newId == "" {
-		return
+		return utility.ErrNotFound
 	}
 
 	oldSecret := ""
 	// fetch transferred asset from sig graph
 	newlyTransferredAsset, err := c.assetController.GetAssetById(
 		ctx,
-		&user,
+		user,
 		model_server.NodeId(newId),
 		false,
 	)
 	if err != nil {
-		return
+		return err
 	}
 
 	for hash := range newlyTransferredAsset.PrivateParentsIds {
@@ -580,36 +617,18 @@ func (c *assetTransferController) newAcceptAssetReceivedHandler(
 
 	updatedAsset, newAsset, err := c.updateCurrentAssetAndAddNewAsset(
 		ctx,
-		&user,
+		user,
 		request.AssetId,
 		oldSecret,
 		newId,
 		newSecret,
 	)
 	if err != nil {
-		return
+		return err
 	}
-
-	// update request status and asset
-	{
-		if event.IsAccepted {
-			request.Status = model.ERequestToAcceptAssetStatusAccepted
-		} else {
-			request.Status = model.ERequestToAcceptAssetStatusRejected
-		}
-		request.AcceptMessage = event.Message
-		request.AssetId = updatedAsset.NodeDbId
-		request.NewAssetId = &newAsset.NodeDbId
-		err = c.assetTransferRepository.UpdateAssetAcceptRequest(
-			ctx,
-			txId,
-			request,
-		)
-
-		if err != nil {
-			return
-		}
-	}
+	request.AssetId = updatedAsset.NodeDbId
+	request.NewAssetId = &newAsset.NodeDbId
+	return nil
 }
 
 func (c *assetTransferController) updateCurrentAssetAndNewAsset(

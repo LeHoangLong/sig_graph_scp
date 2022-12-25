@@ -202,6 +202,28 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 		Message:  message,
 	}
 
+	if acceptOrReject {
+		newSecret, oldSecret, err = s.transferAssetOnSigraphAndUpdateAssetOfRequest(
+			ctx,
+			isNewConnectionSecretOrPublic,
+			updatedRequest,
+		)
+	}
+
+	client := sig_graph_grpc.NewTransferAssetClient(conn)
+	_, err = client.AcceptAsset(ctx, &grpcRequest)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (s *assetTransferServiceGrpc) transferAssetOnSigraphAndUpdateAssetOfRequest(
+	ctx context.Context,
+	isNewConnectionSecretOrPublic bool,
+	request *model_asset_transfer.RequestToAcceptAsset,
+) (newSecret string, oldSecret string, err error) {
 	currentSecret := ""
 	if isNewConnectionSecretOrPublic {
 		currentSecret, err = s.secretIdGeneratorI.NewSecretId(ctx)
@@ -211,17 +233,17 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 	}
 
 	var selectedCandidate *model_asset_transfer.CandidateId
-	for i := range updatedRequest.Candidates {
+	for i := range request.Candidates {
 		var newAsset, updatedAsset *model_sig_graph.Asset
 		updatedAsset, newAsset, err = s.sigGraphClientApi.TransferAsset(
 			ctx,
-			updatedRequest.TimeMs,
-			&updatedRequest.Asset,
-			&updatedRequest.UserKeyPair,
-			updatedRequest.Candidates[i].Id,
-			updatedRequest.Candidates[i].Secret,
+			request.TimeMs,
+			&request.Asset,
+			&request.UserKeyPair,
+			request.Candidates[i].Id,
+			request.Candidates[i].Secret,
 			currentSecret,
-			updatedRequest.Candidates[i].Signature,
+			request.Candidates[i].Signature,
 		)
 
 		if err != nil {
@@ -232,18 +254,11 @@ func (s *assetTransferServiceGrpc) AcceptRequestToAcceptAsset(
 			return
 		}
 
-		selectedCandidate = &updatedRequest.Candidates[i]
-		updatedRequest.NewAsset = newAsset
-		updatedRequest.Asset = *updatedAsset
+		selectedCandidate = &request.Candidates[i]
+		request.NewAsset = newAsset
+		request.Asset = *updatedAsset
 		break
 	}
-
-	client := sig_graph_grpc.NewTransferAssetClient(conn)
-	_, err = client.AcceptAsset(ctx, &grpcRequest)
-	if err != nil {
-		return
-	}
-
 	newSecret = selectedCandidate.Secret
 	oldSecret = currentSecret
 	return
