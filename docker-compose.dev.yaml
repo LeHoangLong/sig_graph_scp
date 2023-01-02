@@ -1,0 +1,43 @@
+version: '3.0'
+services:
+  server:
+    image: lehoanglong/go_grpc:1.19
+    volumes:
+      - ./:/root/server
+    network_mode: host
+    working_dir: /root/server
+    command: go run cmd/server.go
+    environment:
+      - PEER_ADDRESSES=localhost:7051,localhost:9051
+      - CHANNEL_NAME=mychannel
+      - CONTRACT_NAME=token
+      - MSP_ID=Org1MSP
+      - PEM_CERTIFICATE_PATH=/root/server/dev/keystore/Org1/cert.pem
+      - PEM_SECRET_KEY_PATH=/root/server/dev/keystore/Org1/private.pem
+      - SERVER_ADDRESS=:8000
+      - DB_CONNECTION=postgresql://user:password@localhost/db?connect_timeout=10&sslmode=disable
+      - GATEWAY_PEER=peer0.org1.example.com
+      - TLS_PEM_CERTIFICATE_PATH=/root/server/dev/keystore/Org1/ca.crt
+      - ASSET_TRANSFER_SERVER_GRPC_ADDRESS=localhost:5000
+  ca:
+    image: hyperledger/fabric-ca
+    volumes:
+      - ./:/root
+    network_mode: host
+    working_dir: /root
+    command: sleep infinity
+  db:
+    image: postgres:15.0
+    volumes: 
+      - ./db:/var/lib/pgsql/data
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=user
+      - POSTGRES_DB=db
+    network_mode: host
+  proxy:
+    image: haproxy:2.6.6
+    volumes:
+      - ./haproxy:/usr/local/etc/haproxy
+    network_mode: host
+    user: root
