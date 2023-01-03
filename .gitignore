@@ -8,3 +8,4 @@ dev/*
 *.srl
 *.csr
 docker-compose.yaml
+haproxy.cfg
